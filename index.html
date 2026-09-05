@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- viewport-fit=cover + safe-area padding in CSS keeps the scoreboard clear of
+         the notch when launched fullscreen from the home screen. user-scalable=no
+         prevents a double-tap zoom firing during fast pitch tapping. -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#1A1A2E" />
+
+    <!-- iOS home-screen launch: fullscreen, no Safari chrome -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="WildCard" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+
+    <title>WildCard Tagger</title>
+    <style>
+      html, body, #root { height: 100%; margin: 0; padding: 0; }
+      body {
+        background: #FAF5E9;
+        /* Keep content out from under the notch and home indicator */
+        padding: env(safe-area-inset-top) env(safe-area-inset-right)
+                 env(safe-area-inset-bottom) env(safe-area-inset-left);
+        box-sizing: border-box;
+        -webkit-font-smoothing: antialiased;
+      }
+      /* Suppress the iOS tap highlight — with this much tapping it flickers badly */
+      * { -webkit-tap-highlight-color: transparent; }
+      /* Block pull-to-refresh, which otherwise fires mid-tag and reloads the game */
+      body { overscroll-behavior-y: contain; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
