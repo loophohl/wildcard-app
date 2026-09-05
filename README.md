@@ -21,18 +21,43 @@ npm run build    # production build into dist/
 npm run preview  # serve the built output
 ```
 
-## Deploy
-
-First time:
+### On the phone, over wifi
 
 ```bash
-npm i -g vercel
-vercel login
-vercel --prod
+npm run dev -- --host
 ```
 
-Vercel auto-detects Vite. Accept the defaults — `vercel.json` already pins the build
-command, output directory, and SPA rewrite.
+Vite then prints a **Network** URL (e.g. `http://192.168.1.67:5173`). Open that on the
+phone with both devices on the same wifi and edits hot-reload instantly — a much tighter
+loop than deploy-and-check for UI work like button sizing or the velocity scroller feel.
+
+- The LAN IP is DHCP-assigned and changes when the Mac rejoins the network. If the phone
+  stops loading, re-read the Network line.
+- The service worker does **not** run in dev, so this loop won't exercise offline
+  behaviour. Use `npm run preview -- --host` to test the built output with the SW active.
+
+## Deploy
+
+The repo (`loophohl/wildcard-app`) is connected to the Vercel project, so pushing to
+`main` builds automatically. `vercel.json` pins the build command, output directory,
+and SPA rewrite, so no dashboard configuration is needed.
+
+```bash
+git push origin main    # builds on Vercel
+```
+
+Production is set to **manual promotion** — a push produces a build, but
+`app.loophohl.com` only moves once it is promoted:
+
+```bash
+vercel promote <deployment-url>   # or the dashboard's "Promote to Production"
+```
+
+To deploy straight from the working tree, bypassing git:
+
+```bash
+vercel --prod
+```
 
 ## DNS — pointing app.loophohl.com
 
