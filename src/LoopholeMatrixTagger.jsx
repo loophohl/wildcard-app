@@ -1906,6 +1906,10 @@ const ExpandedCellView = ({
   //                       only when the scorer taps Done. extras include battedBall, hitType.
   //   fielderSequence  = positions tapped so far in order, e.g. ['3B', '1B'] for a 5-3.
   const [pendingPa, setPendingPa] = React.useState(null);
+  // Pitch type / velocity captured when Ball in Play was tapped, held until the
+  // cascade resolves and merged into whatever it produces. Null when detail is off,
+  // skipped, or the scorer backed out of the cascade.
+  const [bipPitchInfo, setBipPitchInfo] = React.useState(null);
   const [fielderSequence, setFielderSequence] = React.useState([]);
 
   // v1.5 step 7 — Runner placement state for the diamond.
@@ -1968,7 +1972,17 @@ const ExpandedCellView = ({
   // skipping the pa_top takeover. Saves one tap on the most common cascade entry.
   // From bip_type, the Back button still lands on pa_top, so the scorer can correct
   // a mis-tap by backing up into the full PA Result menu.
-  const onOpenBipQuick = () => setCascadeStage('bip_type');
+  // Ball in Play asks for pitch detail on the tap, same as Ball / Called Strike /
+  // Swing & Miss / Foul, so the prompt order is identical everywhere in the app.
+  // The answer is parked in bipPitchInfo and merged in when the cascade resolves.
+  const onOpenBipQuick = () => {
+    setBipPitchInfo(null);
+    if (pitchDetailOn) {
+      setPitchDetail({ pitchKey: 'in_play', stage: 'type', pitchType: null, paEnd: null, forBip: true });
+      return;
+    }
+    setCascadeStage('bip_type');
+  };
   // Tap on the "Runner Advance" button in the normal cell view → open runner takeover.
   const onOpenRunnerTakeover = () => setCascadeStage('runner');
 
@@ -2071,7 +2085,7 @@ const ExpandedCellView = ({
   const onPaTopLevelSelect = (key) => {
     if (!key) return;
     if (key === 'ball_in_play') {
-      setCascadeStage('bip_type');
+      onOpenBipQuick();
       return;
     }
     if (key === 'dropped_third_strike') {
@@ -2136,6 +2150,13 @@ const ExpandedCellView = ({
     setPitchDetail(null);
     if (!pd) return;
     if (velo != null && onVeloRecorded) onVeloRecorded(velo);
+    if (pd.forBip) {
+      // Detail collected up front — hold it and open the batted-ball cascade. The
+      // play itself is logged later, when the cascade resolves.
+      setBipPitchInfo({ pitchType: pitchType || null, velo: velo == null ? null : velo });
+      setCascadeStage('bip_type');
+      return;
+    }
     if (pd.paEnd) {
       // PA-ending pitch: the parent logs the implicit closing pitch, so detail rides
       // along in extras rather than through onPitchTap. paEndExtras carries whatever
@@ -2151,25 +2172,16 @@ const ExpandedCellView = ({
     }
   };
 
-  // Ball in Play resolves through a cascade (batted-ball type -> outcome -> fielders
-  // -> diamond) rather than a single tap, so detail is asked at the very end, once
-  // the play is committed. Same principle as the pitch row: the outcome is the reflex
-  // action and detail never delays the read of a live ball. commitOnDismiss is set
-  // because a BIP carries real work — fielder string, runner placements — and tapping
-  // the backdrop must log the play, not discard it.
+  // Every Ball in Play exit funnels through here so the detail captured on the tap
+  // rides in on the resolved play, whichever branch of the cascade produced it.
   const firePaEndWithDetail = (category, extras) => {
-    if (pitchDetailOn) {
-      setPitchDetail({
-        pitchKey: 'in_play',
-        stage: 'type',
-        pitchType: null,
-        paEnd: category,
-        paEndExtras: extras,
-        commitOnDismiss: true,
-      });
-      return;
-    }
-    onPaEndTap(category, extras);
+    const info = bipPitchInfo;
+    setBipPitchInfo(null);
+    onPaEndTap(category, {
+      ...extras,
+      ...(info?.pitchType ? { pitchType: info.pitchType } : {}),
+      ...(info?.velo != null ? { velo: info.velo } : {}),
+    });
   };
 
   const onCascadeTypeSelect = (key) => {
@@ -2471,8 +2483,9 @@ const ExpandedCellView = ({
     if (opt.foulPitch) {
       setCascadeStage(null);
       setCascadeBattedBall(null);
-      if (pitchDetailOn) setPitchDetail({ pitchKey: 'foul', stage: 'type', pitchType: null, paEnd: null });
-      else onPitchTap('foul');
+      const info = bipPitchInfo;
+      setBipPitchInfo(null);
+      onPitchTap('foul', info ? { pitchType: info.pitchType, velo: info.velo } : null);
       return;
     }
 
@@ -3072,10 +3085,12 @@ const ExpandedCellView = ({
     } else if (cascadeStage === 'bip_type') {
       setCascadeStage('pa_top');
       setCascadeBattedBall(null);
+      setBipPitchInfo(null);
     } else {
       // pa_top or runner
       setCascadeStage(null);
       setCascadeBattedBall(null);
+      setBipPitchInfo(null);
       // 2B: if the scorer backed all the way out of the inverted runner-advance
       // flow, discard the staged idle placement so it can't leak into a later play.
       // The idle diamond re-seeds from stateKey when idle mode resumes.
@@ -3180,10 +3195,7 @@ const ExpandedCellView = ({
         const veloMax = isSoftball ? 80 : 100;
         return (
           <div
-            onClick={() => {
-              if (pitchDetail.commitOnDismiss) commitPitchDetail(null, null);
-              else setPitchDetail(null);
-            }}
+            onClick={() => { setPitchDetail(null); setBipPitchInfo(null); }}
             style={{
               position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
               display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 65, padding: '20px',
