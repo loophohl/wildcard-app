@@ -46,12 +46,8 @@ and SPA rewrite, so no dashboard configuration is needed.
 git push origin main    # builds on Vercel
 ```
 
-Production is set to **manual promotion** — a push produces a build, but
-`app.loophohl.com` only moves once it is promoted:
-
-```bash
-vercel promote <deployment-url>   # or the dashboard's "Promote to Production"
-```
+A push to `main` deploys straight to production — `app.loophohl.com` updates as soon
+as the build finishes (~25s). There is no promote step, so treat `main` as live.
 
 To deploy straight from the working tree, bypassing git:
 

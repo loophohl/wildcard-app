@@ -2138,11 +2138,38 @@ const ExpandedCellView = ({
     if (velo != null && onVeloRecorded) onVeloRecorded(velo);
     if (pd.paEnd) {
       // PA-ending pitch: the parent logs the implicit closing pitch, so detail rides
-      // along in extras rather than through onPitchTap.
-      onPaEndTap(pd.paEnd, { pitchType: pitchType || undefined, velo: velo == null ? undefined : velo });
+      // along in extras rather than through onPitchTap. paEndExtras carries whatever
+      // the cascade already resolved (batted ball, fielder string, runner movements)
+      // so a Ball in Play keeps its whole play when the detail lands on top.
+      onPaEndTap(pd.paEnd, {
+        ...(pd.paEndExtras || {}),
+        pitchType: pitchType || undefined,
+        velo: velo == null ? undefined : velo,
+      });
     } else {
       onPitchTap(pd.pitchKey, { pitchType: pitchType || null, velo: velo == null ? null : velo });
     }
+  };
+
+  // Ball in Play resolves through a cascade (batted-ball type -> outcome -> fielders
+  // -> diamond) rather than a single tap, so detail is asked at the very end, once
+  // the play is committed. Same principle as the pitch row: the outcome is the reflex
+  // action and detail never delays the read of a live ball. commitOnDismiss is set
+  // because a BIP carries real work — fielder string, runner placements — and tapping
+  // the backdrop must log the play, not discard it.
+  const firePaEndWithDetail = (category, extras) => {
+    if (pitchDetailOn) {
+      setPitchDetail({
+        pitchKey: 'in_play',
+        stage: 'type',
+        pitchType: null,
+        paEnd: category,
+        paEndExtras: extras,
+        commitOnDismiss: true,
+      });
+      return;
+    }
+    onPaEndTap(category, extras);
   };
 
   const onCascadeTypeSelect = (key) => {
@@ -2427,7 +2454,7 @@ const ExpandedCellView = ({
       // Defensive — shouldn't happen, but if it does fall back to a raw out.
       setCascadeStage(null);
       setCascadeBattedBall(null);
-      onPaEndTap('out', { battedBall });
+      firePaEndWithDetail('out', { battedBall });
       return;
     }
 
@@ -2444,7 +2471,8 @@ const ExpandedCellView = ({
     if (opt.foulPitch) {
       setCascadeStage(null);
       setCascadeBattedBall(null);
-      onPitchTap('foul');
+      if (pitchDetailOn) setPitchDetail({ pitchKey: 'foul', stage: 'type', pitchType: null, paEnd: null });
+      else onPitchTap('foul');
       return;
     }
 
@@ -2461,7 +2489,7 @@ const ExpandedCellView = ({
       } else {
         category = key;
       }
-      onPaEndTap(category, extras);
+      firePaEndWithDetail(category, extras);
       return;
     }
 
@@ -2741,7 +2769,7 @@ const ExpandedCellView = ({
     setArmedRunner(null);
     setTouchedRunners(new Set());
     setPlacementHistory([]);
-    onPaEndTap(category, {
+    firePaEndWithDetail(category, {
       ...extras,
       fielderSequence: finalSequence,
       runnerMovements,
@@ -3152,7 +3180,10 @@ const ExpandedCellView = ({
         const veloMax = isSoftball ? 80 : 100;
         return (
           <div
-            onClick={() => setPitchDetail(null)}
+            onClick={() => {
+              if (pitchDetail.commitOnDismiss) commitPitchDetail(null, null);
+              else setPitchDetail(null);
+            }}
             style={{
               position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
               display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 65, padding: '20px',
@@ -3194,7 +3225,7 @@ const ExpandedCellView = ({
                       color: '#7a7468', border: 'none', fontFamily: 'inherit', fontSize: '13px',
                       fontWeight: 600, cursor: 'pointer',
                     }}
-                  >Didn't catch it — log pitch only</button>
+                  >Didn't catch it — log {pitchDetail.pitchKey === 'in_play' ? 'play' : 'pitch'} only</button>
                 </>
               ) : (
                 <VeloScroller
