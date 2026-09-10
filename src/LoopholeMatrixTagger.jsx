@@ -302,7 +302,7 @@ const FieldDiamond = ({
   };
 
   return (
-        <div style={{ width: '100%', maxWidth: '320px', margin: '0 auto 0', position: 'relative' }}>
+        <div style={{ width: '100%', maxWidth: '460px', margin: '0 auto 0', position: 'relative' }}>
         {/* Keyframes used by both the Pitch CTA button and the untouched-runner
             pulse. Defined at the top of the component so the animations work
             whether or not the runner layer renders. */}
@@ -338,6 +338,11 @@ const FieldDiamond = ({
                 one filled element the screen is allowed. */}
             <polygon points="160,260 60,160 160,60 260,160"
                      fill="none" stroke={T.ruleStrong} strokeWidth="1"/>
+            {/* Infield arc — the grass line separating infield from outfield.
+                Struck from the mound so the infielders sit inside it and the
+                outfielders sit beyond it, the way it reads on a real field. */}
+            <path d="M 31 131 A 135 135 0 0 1 289 131"
+                  fill="none" stroke={T.rule} strokeWidth="1"/>
             {/* Pitcher's mound circle */}
             <circle cx="160" cy="170" r="14" fill="none" stroke={T.rule} strokeWidth="1"/>
             {/* Base markers — hollow hairline squares; occupancy is carried by the
@@ -354,44 +359,6 @@ const FieldDiamond = ({
               same keyframes the untouched-runner tokens use. Opens the catch-all
               cascade with Bunt attempt / Balk / Hit by pitch / Intentional ball.
               Hidden while a runner is armed — the bins overlay owns the surface. */}
-          {!armedRunner && onMoundTap && (
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); onMoundTap(); }}
-              aria-label="Pitch options"
-              style={{
-                position: 'absolute',
-                left: '50%',
-                top: '57%',
-                transform: 'translate(-50%, -50%)',
-                background: 'transparent',
-                border: `1px solid ${T.ruleStrong}`,
-                borderRadius: '50%',
-                width: '50px',
-                height: '50px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                boxShadow: 'none',
-                padding: 0,
-                fontFamily: 'inherit',
-                fontSize: '11px',
-                fontWeight: 400,
-                color: T.ink,
-                lineHeight: 1,
-                zIndex: 6,
-                animation: flaring ? 'wildcard-flare 0.55s ease 2' : 'wildcard-runner-untouched 2.8s ease-in-out infinite',
-                ['--wildcard-pulse-color']: T.pulseFade,
-                transition: 'transform 120ms ease',
-              }}
-              onPointerDown={(e) => { e.currentTarget.style.transform = 'translate(-50%, -50%) scale(0.94)'; }}
-              onPointerUp={(e) => { e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1)'; }}
-              onPointerLeave={(e) => { e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1)'; }}
-            >
-              Pitch
-            </button>
-          )}
 
           {/* Undo button — lives in the diamond's bottom-right foul territory,
               right of the 1B line. Always visible (dims with the field when a
@@ -668,17 +635,10 @@ const FieldDiamond = ({
                   onPointerLeave={(e) => { e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1)'; }}
                 >
                   <span style={{
-                    fontSize: '16px',
+                    fontSize: '15px',
                     fontWeight: 400,
                     color: isTapped ? T.paper : T.ink,
                     lineHeight: 1,
-                    fontVariantNumeric: 'tabular-nums',
-                  }}>{f.num}</span>
-                  <span style={{
-                    fontSize: '11px',
-                    fontWeight: 400,
-                    color: isTapped ? T.paper : T.inkMuted,
-                    marginTop: '1px',
                   }}>{f.code}</span>
                   {isTapped && (
                     <span style={{
@@ -3649,40 +3609,51 @@ const ExpandedCellView = ({
       )}
 
       {/* Pitch row */}
-      <div style={{ fontSize: '11px', fontWeight: 400, color: T.inkMuted, margin: '0 2px 6px' }}>
-        Pitch
+      <div style={{
+        display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
+        margin: '0 2px 6px',
+      }}>
+        <span style={{ fontSize: '11px', fontWeight: 400, color: T.inkMuted }}>Pitch</span>
+        <button
+          type="button"
+          onClick={() => { setMorePitchOpen(true); setMoreSubStage(null); }}
+          style={{
+            background: 'transparent', border: 'none', padding: '4px 2px',
+            fontFamily: 'inherit', fontSize: '11px', fontWeight: 400,
+            color: T.inkMuted, cursor: 'pointer',
+          }}
+        >More</button>
       </div>
-      {/* Ruled-paper geometry: a 2x2 divided by hairlines, then In play as the one
-          filled bar. Exactly one filled element is visible on this screen, and it is
+      {/* One row across the bottom of the field: five equal columns divided by
+          hairlines. In play is the fifth and stays the one filled element — it is
           the tap the scorer reaches for most. */}
       <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(5, 1fr)',
+        borderTop: `1px solid ${T.rule}`,
+        borderLeft: `1px solid ${T.rule}`,
         marginBottom: '10px',
         opacity: armedRunner ? 0.4 : 1,
         pointerEvents: armedRunner ? 'none' : 'auto',
         transition: 'opacity 120ms ease',
       }}>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          borderTop: `1px solid ${T.rule}`,
-          borderLeft: `1px solid ${T.rule}`,
-        }}>
-          {pitchButtons.map(b => {
-            const flashing = localFlash === `pitch:${b.key}`;
-            return (
-              <button
-                key={b.key}
-                onClick={() => { flashLocally(`pitch:${b.key}`); handleCellPitchTap(b.key); }}
-                style={{
-                  ...baseBtnStyle,
-                  ...(flashing ? flashStyle : {}),
-                }}
-              >
-                {b.label}
-              </button>
-            );
-          })}
-        </div>
+        {pitchButtons.map(b => {
+          const flashing = localFlash === `pitch:${b.key}`;
+          return (
+            <button
+              key={b.key}
+              onClick={() => { flashLocally(`pitch:${b.key}`); handleCellPitchTap(b.key); }}
+              style={{
+                ...baseBtnStyle,
+                fontSize: '13px',
+                padding: '12px 2px',
+                ...(flashing ? flashStyle : {}),
+              }}
+            >
+              {b.label}
+            </button>
+          );
+        })}
         {/* Ball in play quick button — skips the PA Result top-level takeover and goes
             straight to the batted-ball-type screen. Lives on the pitch row because it's
             a one-tap shortcut for the most common cascade entry. */}
@@ -3690,14 +3661,12 @@ const ExpandedCellView = ({
           onClick={onOpenBipQuick}
           style={{
             ...baseBtnStyle,
-            width: '100%',
+            fontSize: '13px',
+            padding: '12px 2px',
             border: 'none',
-            borderRadius: 0,
             background: T.ink,
             color: T.paper,
             fontWeight: 600,
-            fontSize: '15px',
-            marginTop: '10px',
           }}
         >
           In play
@@ -6397,14 +6366,9 @@ function LoopholeMatrixTagger() {
     <div style={{
       minHeight: '100vh',
       background: T.paper,
-      backgroundImage: `
-        linear-gradient(${T.rule} 1px, transparent 1px),
-        linear-gradient(90deg, ${T.rule} 1px, transparent 1px)
-      `,
-      backgroundSize: '32px 32px',
       fontFamily: 'inherit',
       color: T.ink,
-      padding: '24px 16px',
+      padding: '8px 10px 12px',
       userSelect: 'none',
       WebkitTapHighlightColor: 'transparent',
     }}>
@@ -6677,10 +6641,10 @@ function LoopholeMatrixTagger() {
       {/* Game surface — always shows ExpandedCellView (diamond + actions) */}
       <div
         style={{
-          background: T.paperRaised,
-          border: `1px solid ${T.rule}`,
-          borderRadius: '6px',
-          padding: '16px 12px 12px',
+          background: 'transparent',
+          border: 'none',
+          borderRadius: 0,
+          padding: '4px 0 0',
           maxWidth: '560px',
           margin: '0 auto',
           position: 'relative',
