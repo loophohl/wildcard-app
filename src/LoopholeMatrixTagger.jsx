@@ -42,14 +42,55 @@ const ordinalInning = (n) => {
   return `${n}th`;
 };
 
+// ---------------------------------------------------------------------------
+// Graphite tokens.
+//
+// Near-zero chroma: hierarchy is carried by weight and whitespace, not colour.
+// The interface recedes so the data is the only thing present. Exactly one
+// filled element should be visible on any given screen -- whatever the scorer's
+// next tap most likely is; everything else is hairlines and type.
+//
+// Swapping this one object reskins the whole app, so alternate directions
+// (Ace, Daylight, Night) ship without touching component code.
+// ---------------------------------------------------------------------------
+const T = {
+  paper:          '#FAFAF9',  // page ground
+  paperRaised:    '#FFFFFF',  // modals, popovers
+  paperSunk:      '#F2F2F0',  // pressed / inset states
+  ink:            '#2B2B2E',  // primary text, filled elements
+  inkSecondary:   '#56565A',  // supporting text
+  inkMuted:       '#8A8A87',  // labels, metadata
+  inkFaint:       '#A8A8A5',  // hints
+  inkPlaceholder: '#C9C9C6',  // empty slots, disabled
+  rule:           '#E2E2E0',  // default hairline
+  ruleStrong:     '#C9C9C6',  // emphasis divider, diamond outline
+  scrim:          'rgba(20,20,22,0.38)', // modal backdrop
+  pulse:          'rgba(43,43,46,0.30)',  // armed-token pulse, ink-derived
+  pulseFade:      'rgba(43,43,46,0)',     // pulse keyframe end
+};
+
+// One family, weights 300-600 only -- no 700/800 anywhere.
+const TYPE = {
+  scoreNumeral:  { fontSize: '32px', fontWeight: 300 },
+  count:         { fontSize: '19px', fontWeight: 400 },
+  sectionLabel:  { fontSize: '13px', fontWeight: 500 },
+  button:        { fontSize: '15px', fontWeight: 400 },
+  buttonPrimary: { fontSize: '15px', fontWeight: 300 },
+  body:          { fontSize: '15px', fontWeight: 400 },
+  meta:          { fontSize: '11px', fontWeight: 400 },
+};
+
+// Numbers that change in place must not reflow their neighbours.
+const TABULAR = { fontVariantNumeric: 'tabular-nums' };
+
 // Color scale tuned for the warm off-white card-stock background
 const getCellColor = (pct) => {
-  if (pct === 0) return { bg: '#ebe6d8', text: '#a8a294', border: 'rgba(0,0,0,0.04)' };
-  if (pct < 2)   return { bg: '#c4d4b8', text: '#1a1a1a', border: 'rgba(0,0,0,0.06)' };
-  if (pct < 5)   return { bg: '#a8c97a', text: '#1a1a1a', border: 'rgba(0,0,0,0.06)' };
-  if (pct < 8)   return { bg: '#cfd055', text: '#1a1a1a', border: 'rgba(0,0,0,0.06)' };
-  if (pct < 12)  return { bg: '#e8943a', text: '#1a1a1a', border: 'rgba(0,0,0,0.08)' };
-  return { bg: '#d94425', text: '#ffffff', border: 'rgba(0,0,0,0.22)' };
+  if (pct === 0) return { bg: T.rule, text: T.inkFaint, border: T.rule };
+  if (pct < 2)   return { bg: T.rule, text: T.ink, border: T.rule };
+  if (pct < 5)   return { bg: T.rule, text: T.ink, border: T.rule };
+  if (pct < 8)   return { bg: T.rule, text: T.ink, border: T.rule };
+  if (pct < 12)  return { bg: T.ink, text: T.ink, border: T.rule };
+  return { bg: T.ink, text: T.paperRaised, border: T.ruleStrong };
 };
 
 // Diamond SVG marker for the base occupancy row labels
@@ -60,8 +101,8 @@ const BaseDiamond = ({ filled, size, large }) => {
       <rect
         x="1" y="1" width="8" height="8"
         transform="rotate(45 5 5)"
-        fill={filled ? '#e8943a' : 'transparent'}
-        stroke="#e8943a"
+        fill={filled ? T.ink : 'none'}
+        stroke={filled ? T.ink : T.ruleStrong}
         strokeWidth="1"
       />
     </svg>
@@ -268,12 +309,12 @@ const FieldDiamond = ({
         <style>{`
           @keyframes wildcard-runner-untouched {
             0%, 100% {
-              box-shadow: 0 0 0 0 var(--wildcard-pulse-color, rgba(74,118,184,0.55)),
-                          0 2px 4px rgba(0,0,0,0.18);
+              box-shadow: 0 0 0 0 var(--wildcard-pulse-color, ${T.pulse}),
+                          0 2px 4px ${T.ruleStrong};
             }
             50% {
               box-shadow: 0 0 0 8px transparent,
-                          0 2px 4px rgba(0,0,0,0.18);
+                          0 2px 4px ${T.ruleStrong};
             }
           }
         `}</style>
@@ -292,23 +333,26 @@ const FieldDiamond = ({
             transition: 'opacity 120ms ease',
           }}>
           <svg viewBox="0 0 320 320" style={{ width: '100%', height: '100%', display: 'block' }}>
-            {/* Infield diamond shape (basepaths) - rotated square from home */}
+            {/* Hairline geometry only — no dirt or grass rendering. The field is
+                implied by the basepaths; anything filled here would compete with the
+                one filled element the screen is allowed. */}
             <polygon points="160,260 60,160 160,60 260,160"
-                     fill="#e8d9b6" stroke="#a8946a" strokeWidth="1.5"/>
+                     fill="none" stroke={T.ruleStrong} strokeWidth="1"/>
             {/* Pitcher's mound circle */}
-            <circle cx="160" cy="170" r="14" fill="none" stroke="#a8946a" strokeWidth="1" opacity="0.5"/>
-            {/* Base markers */}
-            <rect x="155" y="255" width="10" height="10" fill="#fff" stroke="#a8946a" strokeWidth="1"/>
-            <rect x="255" y="155" width="10" height="10" fill="#fff" stroke="#a8946a" strokeWidth="1"/>
-            <rect x="155" y="55"  width="10" height="10" fill="#fff" stroke="#a8946a" strokeWidth="1"/>
-            <rect x="55"  y="155" width="10" height="10" fill="#fff" stroke="#a8946a" strokeWidth="1"/>
+            <circle cx="160" cy="170" r="14" fill="none" stroke={T.rule} strokeWidth="1"/>
+            {/* Base markers — hollow hairline squares; occupancy is carried by the
+                runner tokens, not by the bags. */}
+            <rect x="155" y="255" width="10" height="10" fill="none" stroke={T.ruleStrong} strokeWidth="1"/>
+            <rect x="255" y="155" width="10" height="10" fill="none" stroke={T.ruleStrong} strokeWidth="1"/>
+            <rect x="155" y="55"  width="10" height="10" fill="none" stroke={T.ruleStrong} strokeWidth="1"/>
+            <rect x="55"  y="155" width="10" height="10" fill="none" stroke={T.ruleStrong} strokeWidth="1"/>
           </svg>
 
           {/* PITCH button on the mound (mirrors GameChanger). Circle matching the
               fielder buttons (50px, same border treatment), in brand red so it reads
               as the active call-to-action, with a continuous pulse driven by the
               same keyframes the untouched-runner tokens use. Opens the catch-all
-              cascade with Bunt Attempt / Balk / Hit By Pitch / Intentional Ball.
+              cascade with Bunt attempt / Balk / Hit by pitch / Intentional ball.
               Hidden while a runner is armed — the bins overlay owns the surface. */}
           {!armedRunner && onMoundTap && (
             <button
@@ -320,8 +364,8 @@ const FieldDiamond = ({
                 left: '50%',
                 top: '57%',
                 transform: 'translate(-50%, -50%)',
-                background: '#d94425',
-                border: '2px solid #d94425',
+                background: 'transparent',
+                border: `1px solid ${T.ruleStrong}`,
                 borderRadius: '50%',
                 width: '50px',
                 height: '50px',
@@ -329,18 +373,16 @@ const FieldDiamond = ({
                 alignItems: 'center',
                 justifyContent: 'center',
                 cursor: 'pointer',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.18)',
+                boxShadow: 'none',
                 padding: 0,
                 fontFamily: 'inherit',
-                fontSize: '10px',
-                fontWeight: 800,
-                letterSpacing: '0.08em',
-                textTransform: 'uppercase',
-                color: '#fff',
+                fontSize: '11px',
+                fontWeight: 400,
+                color: T.ink,
                 lineHeight: 1,
                 zIndex: 6,
                 animation: flaring ? 'wildcard-flare 0.55s ease 2' : 'wildcard-runner-untouched 2.8s ease-in-out infinite',
-                ['--wildcard-pulse-color']: 'rgba(217,68,37,0.55)',
+                ['--wildcard-pulse-color']: T.pulseFade,
                 transition: 'transform 120ms ease',
               }}
               onPointerDown={(e) => { e.currentTarget.style.transform = 'translate(-50%, -50%) scale(0.94)'; }}
@@ -364,18 +406,16 @@ const FieldDiamond = ({
                 position: 'absolute',
                 right: '4%',
                 bottom: '4%',
-                background: canUndo ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.5)',
-                border: `1.5px solid ${canUndo ? 'rgba(0,0,0,0.25)' : 'rgba(0,0,0,0.1)'}`,
-                borderRadius: '8px',
+                background: 'transparent',
+                border: `1px solid ${canUndo ? T.ruleStrong : T.rule}`,
+                borderRadius: 0,
                 padding: '6px 10px',
                 fontFamily: 'inherit',
-                fontSize: '10px',
-                fontWeight: 800,
-                letterSpacing: '0.08em',
-                textTransform: 'uppercase',
-                color: canUndo ? '#555' : '#c8c4b8',
+                fontSize: '11px',
+                fontWeight: 400,
+                color: canUndo ? T.inkMuted : T.inkPlaceholder,
                 cursor: canUndo ? 'pointer' : 'not-allowed',
-                boxShadow: canUndo ? '0 1px 3px rgba(0,0,0,0.15)' : 'none',
+                boxShadow: 'none',
                 zIndex: 5,
                 display: 'flex',
                 alignItems: 'center',
@@ -418,13 +458,13 @@ const FieldDiamond = ({
                   style={{
                     width: '50px',
                     fontSize: '14px',
-                    fontWeight: 800,
+                    fontWeight: 400,
                     textAlign: 'center',
                     padding: '6px 4px',
-                    border: '2px solid #e8943a',
+                    border: `2px solid ${T.ink}`,
                     borderRadius: '25px',
-                    background: '#fff',
-                    color: '#1a1a1a',
+                    background: T.paperRaised,
+                    color: T.ink,
                     outline: 'none',
                     fontFamily: 'inherit',
                   }}
@@ -442,17 +482,17 @@ const FieldDiamond = ({
                   width: '50px',
                   height: '50px',
                   borderRadius: '50%',
-                  background: '#e8943a',
-                  border: '2px solid #e8943a',
-                  color: '#fff',
+                  background: T.ink,
+                  border: `1px solid ${T.ink}`,
+                  color: T.paper,
                   fontSize: '12px',
-                  fontWeight: 800,
+                  fontWeight: 500,
                   fontFamily: 'inherit',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   cursor: 'pointer',
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.18)',
+                  boxShadow: 'none',
                   zIndex: 7,
                   padding: 0,
                   lineHeight: 1,
@@ -495,13 +535,13 @@ const FieldDiamond = ({
                   style={{
                     width: '50px',
                     fontSize: '14px',
-                    fontWeight: 800,
+                    fontWeight: 400,
                     textAlign: 'center',
                     padding: '6px 4px',
-                    border: '2px solid #4a76b8',
+                    border: `2px solid ${T.ink}`,
                     borderRadius: '25px',
-                    background: '#fff',
-                    color: '#1a1a1a',
+                    background: T.paperRaised,
+                    color: T.ink,
                     outline: 'none',
                     fontFamily: 'inherit',
                   }}
@@ -520,17 +560,20 @@ const FieldDiamond = ({
                   width: '46px',
                   height: '46px',
                   borderRadius: '50%',
-                  background: '#4a76b8',
-                  border: '2px solid #4a76b8',
-                  color: '#fff',
+                  // Paper, not transparent: the chip sits over the pitcher fielder
+                  // token and must occlude it. Paper-on-paper with a hairline keeps
+                  // it out of the one-filled-element budget.
+                  background: T.paper,
+                  border: `1px solid ${T.ruleStrong}`,
+                  color: T.ink,
                   fontSize: '12px',
-                  fontWeight: 800,
+                  fontWeight: 500,
                   fontFamily: 'inherit',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   cursor: 'pointer',
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.18)',
+                  boxShadow: 'none',
                   zIndex: 6,
                   padding: 0,
                   lineHeight: 1,
@@ -600,8 +643,8 @@ const FieldDiamond = ({
                     // pulse) are what the scorer is acting on. When a fielder
                     // IS tapped (during sequence build), they flip to brand red
                     // so the active sequence stays visible.
-                    background: isTapped ? '#d94425' : '#1a1a1a',
-                    border: `2px solid ${isTapped ? '#d94425' : '#1a1a1a'}`,
+                    background: isTapped ? T.ink : 'transparent',
+                    border: `1px solid ${isTapped ? T.ink : T.ruleStrong}`,
                     borderRadius: '50%',
                     width: '50px',
                     height: '50px',
@@ -610,7 +653,7 @@ const FieldDiamond = ({
                     alignItems: 'center',
                     justifyContent: 'center',
                     cursor: 'pointer',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.18)',
+                    boxShadow: 'none',
                     padding: 0,
                     fontFamily: 'inherit',
                     transition: 'transform 120ms ease, background 150ms ease, border-color 150ms ease',
@@ -626,35 +669,33 @@ const FieldDiamond = ({
                 >
                   <span style={{
                     fontSize: '16px',
-                    fontWeight: 800,
-                    color: '#fff',
+                    fontWeight: 400,
+                    color: isTapped ? T.paper : T.ink,
                     lineHeight: 1,
                     fontVariantNumeric: 'tabular-nums',
                   }}>{f.num}</span>
                   <span style={{
-                    fontSize: '8px',
-                    fontWeight: 700,
-                    color: 'rgba(255,255,255,0.78)',
-                    letterSpacing: '0.04em',
+                    fontSize: '11px',
+                    fontWeight: 400,
+                    color: isTapped ? T.paper : T.inkMuted,
                     marginTop: '1px',
-                    textTransform: 'uppercase',
                   }}>{f.code}</span>
                   {isTapped && (
                     <span style={{
                       position: 'absolute',
                       top: '-4px',
                       right: '-4px',
-                      background: '#1a1a1a',
-                      color: '#fff',
+                      background: T.ink,
+                      color: T.paperRaised,
                       borderRadius: '50%',
                       width: '18px',
                       height: '18px',
-                      fontSize: '10px',
-                      fontWeight: 800,
+                      fontSize: '11px',
+                      fontWeight: 400,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      border: '2px solid #fdfaf2',
+                      border: `2px solid ${T.paperRaised}`,
                     }}>{badgeNum}</span>
                   )}
                 </button>
@@ -737,19 +778,17 @@ const FieldDiamond = ({
                       position: 'absolute',
                       top: '67%',
                       left: '2%',
-                      background: '#fdfaf2',
+                      background: T.paperRaised,
                       color: '#555',
-                      border: '1px solid rgba(0,0,0,0.18)',
+                      border: `1px solid ${T.ruleStrong}`,
                       borderRadius: '4px',
                       padding: '5px 9px',
                       fontSize: '11px',
-                      fontWeight: 700,
-                      letterSpacing: '0.08em',
-                      textTransform: 'uppercase',
+                      fontWeight: 400,
                       cursor: 'pointer',
                       fontFamily: 'inherit',
                       zIndex: 6,
-                      boxShadow: '0 1px 2px rgba(0,0,0,0.08)',
+                      boxShadow: `0 1px 2px ${T.rule}`,
                     }}
                   >
                     ↶ Undo
@@ -764,21 +803,21 @@ const FieldDiamond = ({
                 <style>{`
                   @keyframes wildcard-runner-untouched {
                     0%, 100% {
-                      box-shadow: 0 0 0 0 var(--wildcard-pulse-color, rgba(74,118,184,0.55)),
-                                  0 2px 4px rgba(0,0,0,0.18);
+                      box-shadow: 0 0 0 0 var(--wildcard-pulse-color, ${T.pulse}),
+                                  0 2px 4px ${T.ruleStrong};
                     }
                     50% {
                       box-shadow: 0 0 0 8px transparent,
-                                  0 2px 4px rgba(0,0,0,0.18);
+                                  0 2px 4px ${T.ruleStrong};
                     }
                   }
                   @keyframes wildcard-flare {
                     0%, 100% {
-                      box-shadow: 0 0 0 0 rgba(232,148,58,0), 0 2px 4px rgba(0,0,0,0.18);
+                      box-shadow: 0 0 0 0 ${T.pulseFade}, 0 2px 4px ${T.ruleStrong};
                       transform: translate(-50%, -50%) scale(1);
                     }
                     50% {
-                      box-shadow: 0 0 0 7px rgba(232,148,58,0.45), 0 2px 6px rgba(0,0,0,0.22);
+                      box-shadow: 0 0 0 7px ${T.pulse}, 0 2px 6px ${T.ruleStrong};
                       transform: translate(-50%, -50%) scale(1.13);
                     }
                   }
@@ -790,14 +829,14 @@ const FieldDiamond = ({
                 {liveTokens.map(({ source, position, isArmed, exiting, waiting }) => {
                   const isBatter = source === 'batter';
                   // All offensive tokens use the same orange accent (batter color).
-                  const accent = '#e8943a';
-                  const armedShadow = 'rgba(232,148,58,0.25)';
+                  const accent = T.ink;
+                  const armedShadow = T.pulse;
                   const isTouched = touchedRunners && touchedRunners.has(source);
                   const shouldPulse = false; // pulse removed — runners stay static
-                  const pulseColor = 'rgba(232,148,58,0.55)';
+                  const pulseColor = T.pulse;
                   // Exiting tokens (scored / out) — terminal. Slide to the spot, fade,
                   // recolor: green ring for a score, gray for an out. Non-interactive.
-                  const exitColor = exiting === 'scored' ? '#4c9a3f' : '#9a9a9a';
+                  const exitColor = exiting === 'scored' ? T.ink : T.inkPlaceholder;
                   return (
                     <button
                       key={`runner-${source}`}
@@ -812,19 +851,18 @@ const FieldDiamond = ({
                         width: '50px',
                         height: '50px',
                         borderRadius: '50%',
-                        background: exiting ? '#fff' : (isArmed ? accent : '#fff'),
+                        background: exiting ? T.paperRaised : (isArmed ? accent : T.paperRaised),
                         border: `2px solid ${exiting ? exitColor : accent}`,
-                        color: exiting ? exitColor : (isArmed ? '#fff' : accent),
-                        fontSize: '10px',
-                        fontWeight: 800,
-                        letterSpacing: '0.04em',
+                        color: exiting ? exitColor : (isArmed ? T.paperRaised : accent),
+                        fontSize: '11px',
+                        fontWeight: 400,
                         cursor: exiting ? 'default' : 'pointer',
                         padding: 0,
                         zIndex: (exiting || waiting) ? 3 : 5,
                         opacity: (exiting || waiting) ? 0 : 1,
                         boxShadow: isArmed
-                          ? `0 0 0 4px ${armedShadow}, 0 2px 4px rgba(0,0,0,0.18)`
-                          : '0 2px 4px rgba(0,0,0,0.18)',
+                          ? `0 0 0 4px ${armedShadow}, 0 2px 4px ${T.ruleStrong}`
+                          : `0 2px 4px ${T.ruleStrong}`,
                         fontFamily: 'inherit',
                         display: 'flex',
                         alignItems: 'center',
@@ -840,7 +878,7 @@ const FieldDiamond = ({
                       }}
                     >
                       {exiting === 'scored' ? '✓' : exiting === 'out' ? '✕'
-                        : isBatter ? (batterJersey ? `#${batterJersey}` : 'BAT')
+                        : isBatter ? (batterJersey ? `#${batterJersey}` : 'Bat')
                         : ((baseJerseys && baseJerseys[source]) ? `#${baseJerseys[source]}` : source)}
                     </button>
                   );
@@ -889,19 +927,17 @@ const FieldDiamond = ({
                   borderTopRightRadius: `${W}px`,
                   borderBottomLeftRadius: '6px',
                   borderBottomRightRadius: '6px',
-                  background: isOwn ? '#5a7d4f' : '#4c9a3f',
-                  color: '#fff',
-                  border: '2px solid #fff',
+                  background: isOwn ? T.ink : T.ink,
+                  color: T.paperRaised,
+                  border: `2px solid ${T.paperRaised}`,
                   cursor: 'pointer',
                   fontFamily: 'inherit',
                   fontSize: '11px',
-                  fontWeight: 800,
-                  letterSpacing: '0.06em',
-                  textTransform: 'uppercase',
+                  fontWeight: 400,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                  boxShadow: `0 2px 6px ${T.scrim}`,
                   opacity: 1,
                 }}
               >
@@ -918,19 +954,17 @@ const FieldDiamond = ({
                   borderTopRightRadius: '6px',
                   borderBottomLeftRadius: `${W}px`,
                   borderBottomRightRadius: `${W}px`,
-                  background: '#c0392b',
-                  color: '#fff',
-                  border: '2px solid #fff',
+                  background: T.inkMuted,
+                  color: T.paperRaised,
+                  border: `2px solid ${T.paperRaised}`,
                   cursor: 'pointer',
                   fontFamily: 'inherit',
                   fontSize: '11px',
-                  fontWeight: 800,
-                  letterSpacing: '0.06em',
-                  textTransform: 'uppercase',
+                  fontWeight: 400,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                  boxShadow: `0 2px 6px ${T.scrim}`,
                 }}
               >
                 Out
@@ -943,18 +977,18 @@ const FieldDiamond = ({
 };
 
 // v1.4 — CascadeScreen
-// Full-takeover screen for PA Result and Runner Advance selections. Replaces the
+// Full-takeover screen for PA Result and Runner advance selections. Replaces the
 // cell view's body (everything below the header) until the scorer either selects
 // a leaf option or navigates back. GameChanger-style — large tap targets, one
 // option per row, no menu re-opens.
 //
 // Stages:
 //   'pa_top'         → top-level PA Result options
-//   'bip_type'       → batted-ball type (Ground / Hard Ground / Fly / Pop Fly / Line / Bunt)
+//   'bip_type'       → batted-ball type (Ground / Hard Ground / Fly / Pop fly / Line / Bunt)
 //   'bip_outcome'    → BIP outcome (Hit / Out / Error / etc., type-specific)
-//   'bip_batter_out' → Batter Out sub-cascade (Out at 1st / DP / etc., type-specific)
+//   'bip_batter_out' → Batter out sub-cascade (Out at 1st / DP / etc., type-specific)
 //   'bip_fielders'   → Fielder picker (v1.5 step 6) — distinct layout with sequence + grid + Done
-//   'runner'         → Runner Advance options
+//   'runner'         → Runner advance options
 const CascadeScreen = ({
   stage,
   battedBall,
@@ -1016,11 +1050,10 @@ const CascadeScreen = ({
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           marginBottom: '14px', paddingBottom: '10px',
-          borderBottom: '1px solid rgba(217, 68, 37, 0.2)',
+          borderBottom: `1px solid ${T.rule}`,
         }}>
           <div style={{
-            fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em',
-            textTransform: 'uppercase', lineHeight: 1.3,
+            fontSize: '11px', fontWeight: 400, lineHeight: 1.3,
           }}>
             {pendingRunnerAdvance ? (() => {
               const categoryLabels = {
@@ -1032,41 +1065,40 @@ const CascadeScreen = ({
               };
               const pitchLabels = {
                 ball: 'Ball',
-                called_strike: 'Called Strike',
-                swing_miss: 'Swing & Miss',
+                called_strike: 'Called strike',
+                swing_miss: 'Swing & miss',
                 foul: 'Foul',
               };
               return (
                 <>
-                  <span style={{ color: '#7a7468' }}>Runner Advance</span>
-                  {'  '}<span style={{ color: '#7a7468' }}>→ {categoryLabels[pendingRunnerAdvance.category] || pendingRunnerAdvance.category}</span>
+                  <span style={{ color: T.inkMuted }}>Runner advance</span>
+                  {'  '}<span style={{ color: T.inkMuted }}>→ {categoryLabels[pendingRunnerAdvance.category] || pendingRunnerAdvance.category}</span>
                   {pendingRunnerAdvance.pitch && (
-                    <>{'  '}<span style={{ color: '#7a7468' }}>→ {pitchLabels[pendingRunnerAdvance.pitch] || pendingRunnerAdvance.pitch}</span></>
+                    <>{'  '}<span style={{ color: T.inkMuted }}>→ {pitchLabels[pendingRunnerAdvance.pitch] || pendingRunnerAdvance.pitch}</span></>
                   )}
-                  {'  '}<span style={{ color: '#d94425' }}>→ Diamond</span>
+                  {'  '}<span style={{ color: T.inkMuted }}>→ Diamond</span>
                 </>
               );
             })() : pendingPa?.category === 'dropped_third_strike' ? (
               <>
-                <span style={{ color: '#7a7468' }}>Dropped Third Strike</span>
-                {'  '}<span style={{ color: '#7a7468' }}>→ {pendingPa.extras?.droppedThirdSafe ? 'Safe at 1st' : 'Out at 1st'}</span>
-                {'  '}<span style={{ color: '#d94425' }}>→ Diamond</span>
+                <span style={{ color: T.inkMuted }}>Dropped third strike</span>
+                {'  '}<span style={{ color: T.inkMuted }}>→ {pendingPa.extras?.droppedThirdSafe ? 'Safe at 1st' : 'Out at 1st'}</span>
+                {'  '}<span style={{ color: T.inkMuted }}>→ Diamond</span>
               </>
             ) : (
               <>
-                <span style={{ color: '#7a7468' }}>{typeLabel}</span>
-                {'  '}<span style={{ color: '#7a7468' }}>→ {outcomeLabel}</span>
-                {'  '}<span style={{ color: '#d94425' }}>→ Fielders</span>
+                <span style={{ color: T.inkMuted }}>{typeLabel}</span>
+                {'  '}<span style={{ color: T.inkMuted }}>→ {outcomeLabel}</span>
+                {'  '}<span style={{ color: T.inkMuted }}>→ Fielders</span>
               </>
             )}
           </div>
           <button
             onClick={onBack}
             style={{
-              background: 'transparent', border: '1px solid rgba(0,0,0,0.18)',
-              borderRadius: '3px', color: '#555', fontSize: '10px',
-              fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase',
-              cursor: 'pointer', padding: '6px 10px', fontFamily: 'inherit',
+              background: 'transparent', border: `1px solid ${T.ruleStrong}`,
+              borderRadius: '3px', color: '#555', fontSize: '11px',
+              fontWeight: 400, cursor: 'pointer', padding: '6px 10px', fontFamily: 'inherit',
             }}
           >
             ← Back
@@ -1075,8 +1107,8 @@ const CascadeScreen = ({
 
         {/* Sequence display — accumulates as scorer taps. Italic placeholder when empty. */}
         <div style={{
-          background: '#faf5e8',
-          border: '1px dashed rgba(0,0,0,0.18)',
+          background: T.paper,
+          border: `1px dashed ${T.ruleStrong}`,
           borderRadius: '4px',
           padding: '10px 14px',
           marginBottom: '12px',
@@ -1088,14 +1120,13 @@ const CascadeScreen = ({
         }}>
           {seqText ? (
             <span style={{
-              fontSize: '20px', fontWeight: 800, color: '#1a1a1a',
-              letterSpacing: '0.08em', fontVariantNumeric: 'tabular-nums',
+              fontSize: '20px', fontWeight: 400, color: T.ink, fontVariantNumeric: 'tabular-nums',
             }}>
               {seqText}
             </span>
           ) : (
             <span style={{
-              fontSize: '11px', color: '#a8a294', fontStyle: 'italic',
+              fontSize: '11px', color: T.inkFaint, fontStyle: 'italic',
             }}>
               Tap fielders in order…
             </span>
@@ -1134,16 +1165,14 @@ const CascadeScreen = ({
               disabled={!enabled}
               style={{
                 width: '100%',
-                background: enabled ? '#6b9a26' : '#d0cdc1',
+                background: enabled ? T.ink : T.inkPlaceholder,
                 border: 'none',
-                color: enabled ? '#fff' : '#a8a294',
+                color: enabled ? T.paperRaised : T.inkFaint,
                 borderRadius: '5px',
                 padding: '14px',
                 fontFamily: 'inherit',
                 fontSize: '13px',
-                fontWeight: 700,
-                letterSpacing: '0.12em',
-                textTransform: 'uppercase',
+                fontWeight: 500,
                 marginTop: '10px',
                 cursor: enabled ? 'pointer' : 'not-allowed',
               }}
@@ -1161,27 +1190,27 @@ const CascadeScreen = ({
 
   if (stage === 'pa_top') {
     opts = paOptions;
-    prompt = 'Plate Appearance Result';
+    prompt = 'Plate appearance';
     onSelect = onPaTopSelect;
     breadcrumb = (
       <span>
-        <span style={{ color: '#d94425' }}>Result</span>
+        <span style={{ color: T.inkMuted }}>Result</span>
       </span>
     );
-    accentBg = '#fff5ee';
-    accentBorder = 'rgba(217, 68, 37, 0.35)';
+    accentBg = T.paper;
+    accentBorder = T.rule;
   } else if (stage === 'bip_type') {
     opts = battedBallOptions;
     prompt = 'What kind of ball in play?';
     onSelect = onTypeSelect;
     breadcrumb = (
       <span>
-        <span style={{ color: '#7a7468' }}>Ball in Play</span>
-        {'  '}<span style={{ color: '#d94425' }}>→ Type</span>
+        <span style={{ color: T.inkMuted }}>Ball in play</span>
+        {'  '}<span style={{ color: T.inkMuted }}>→ Type</span>
       </span>
     );
-    accentBg = '#fff5ee';
-    accentBorder = 'rgba(217, 68, 37, 0.35)';
+    accentBg = T.paper;
+    accentBorder = T.rule;
   } else if (stage === 'bip_outcome') {
     const typeLabel = battedBall ? (battedBallOptions.find(o => o.key === battedBall)?.label || '') : '';
     opts = bipOutcomeOptions;
@@ -1189,13 +1218,13 @@ const CascadeScreen = ({
     onSelect = onOutcomeSelect;
     breadcrumb = (
       <span>
-        <span style={{ color: '#7a7468' }}>Ball in Play</span>
-        {'  '}<span style={{ color: '#7a7468' }}>→ {typeLabel}</span>
-        {'  '}<span style={{ color: '#d94425' }}>→ Outcome</span>
+        <span style={{ color: T.inkMuted }}>Ball in play</span>
+        {'  '}<span style={{ color: T.inkMuted }}>→ {typeLabel}</span>
+        {'  '}<span style={{ color: T.inkMuted }}>→ Outcome</span>
       </span>
     );
-    accentBg = '#fff5ee';
-    accentBorder = 'rgba(217, 68, 37, 0.35)';
+    accentBg = T.paper;
+    accentBorder = T.rule;
   } else if (stage === 'bip_batter_out') {
     const typeLabel = battedBall ? (battedBallOptions.find(o => o.key === battedBall)?.label || '') : '';
     opts = batterOutOptions;
@@ -1203,14 +1232,14 @@ const CascadeScreen = ({
     onSelect = onBatterOutSelect;
     breadcrumb = (
       <span>
-        <span style={{ color: '#7a7468' }}>Ball in Play</span>
-        {'  '}<span style={{ color: '#7a7468' }}>→ {typeLabel}</span>
-        {'  '}<span style={{ color: '#7a7468' }}>→ Batter Out</span>
-        {'  '}<span style={{ color: '#d94425' }}>→ Type</span>
+        <span style={{ color: T.inkMuted }}>Ball in play</span>
+        {'  '}<span style={{ color: T.inkMuted }}>→ {typeLabel}</span>
+        {'  '}<span style={{ color: T.inkMuted }}>→ Batter out</span>
+        {'  '}<span style={{ color: T.inkMuted }}>→ Type</span>
       </span>
     );
-    accentBg = '#fff5ee';
-    accentBorder = 'rgba(217, 68, 37, 0.35)';
+    accentBg = T.paper;
+    accentBorder = T.rule;
   } else if (stage === 'bip_fc_forceout') {
     // FC forceout-location sub-cascade. Options depend on the cell's stateKey:
     //   loaded → Home / 3B / 2B (forceout at home means 3B runner is out, no run scores)
@@ -1233,16 +1262,16 @@ const CascadeScreen = ({
     onSelect = onFcForceoutSelect;
     breadcrumb = (
       <span>
-        <span style={{ color: '#7a7468' }}>Ball in Play</span>
-        {'  '}<span style={{ color: '#7a7468' }}>→ {typeLabel}</span>
-        {'  '}<span style={{ color: '#7a7468' }}>→ Fielder's Choice</span>
-        {'  '}<span style={{ color: '#d94425' }}>→ Forceout</span>
+        <span style={{ color: T.inkMuted }}>Ball in play</span>
+        {'  '}<span style={{ color: T.inkMuted }}>→ {typeLabel}</span>
+        {'  '}<span style={{ color: T.inkMuted }}>→ Fielder's choice</span>
+        {'  '}<span style={{ color: T.inkMuted }}>→ Forceout</span>
       </span>
     );
-    accentBg = '#fff5ee';
-    accentBorder = 'rgba(217, 68, 37, 0.35)';
+    accentBg = T.paper;
+    accentBorder = T.rule;
   } else if (stage === 'dropped_third_outcome') {
-    // Dropped Third Strike outcome sub-cascade. Choose whether the batter was
+    // Dropped third strike outcome sub-cascade. Choose whether the batter was
     // put out or reached safely. Either way the diamond opens next so the scorer
     // can capture runner movement and the catcher's recovery throw.
     opts = [
@@ -1253,12 +1282,12 @@ const CascadeScreen = ({
     onSelect = onDroppedThirdOutcomeSelect;
     breadcrumb = (
       <span>
-        <span style={{ color: '#7a7468' }}>Dropped Third Strike</span>
-        {'  '}<span style={{ color: '#d94425' }}>→ Outcome</span>
+        <span style={{ color: T.inkMuted }}>Dropped third strike</span>
+        {'  '}<span style={{ color: T.inkMuted }}>→ Outcome</span>
       </span>
     );
-    accentBg = '#fff5ee';
-    accentBorder = 'rgba(217, 68, 37, 0.35)';
+    accentBg = T.paper;
+    accentBorder = T.rule;
   } else if (stage === 'runner_pitch') {
     // v1.5 — Pitch sub-cascade for runner-advance categories. Captures the pitch
     // that coincided with the steal/CS/BE so the pitch event is logged alongside
@@ -1275,15 +1304,15 @@ const CascadeScreen = ({
     const cat = pendingRunnerAdvance?.category;
     const baseOpts = [
       { key: 'ball',          label: 'Ball' },
-      { key: 'called_strike', label: 'Called Strike' },
-      { key: 'swing_miss',    label: 'Swing & Miss' },
+      { key: 'called_strike', label: 'Called strike' },
+      { key: 'swing_miss',    label: 'Swing & miss' },
       { key: 'foul',          label: 'Foul' },
     ];
     if (cat === 'defensive_indifference') {
       opts = [
         { key: 'ball',          label: 'Ball' },
-        { key: 'called_strike', label: 'Called Strike' },
-        { key: 'swing_miss',    label: 'Swing & Miss' },
+        { key: 'called_strike', label: 'Called strike' },
+        { key: 'swing_miss',    label: 'Swing & miss' },
         { key: 'no_pitch',      label: 'No Pitch' },
       ];
     } else if (cat === 'battery_error') {
@@ -1295,13 +1324,13 @@ const CascadeScreen = ({
     onSelect = onRunnerPitchSelect;
     breadcrumb = (
       <span>
-        <span style={{ color: '#7a7468' }}>Runner Advance</span>
-        {'  '}<span style={{ color: '#7a7468' }}>→ {categoryLabels[cat] || cat}</span>
-        {'  '}<span style={{ color: '#d94425' }}>→ Pitch</span>
+        <span style={{ color: T.inkMuted }}>Runner advance</span>
+        {'  '}<span style={{ color: T.inkMuted }}>→ {categoryLabels[cat] || cat}</span>
+        {'  '}<span style={{ color: T.inkMuted }}>→ Pitch</span>
       </span>
     );
-    accentBg = '#faf5e8';
-    accentBorder = 'rgba(0,0,0,0.18)';
+    accentBg = T.paper;
+    accentBorder = T.ruleStrong;
   } else if (stage === 'pickoff_outcome') {
     // Pickoff outcome — pickoffs often go awry, so the result isn't always an out.
     opts = [
@@ -1313,25 +1342,25 @@ const CascadeScreen = ({
     onSelect = onPickoffOutcomeSelect;
     breadcrumb = (
       <span>
-        <span style={{ color: '#7a7468' }}>Runner Advance</span>
-        {'  '}<span style={{ color: '#7a7468' }}>→ Pickoff</span>
-        {'  '}<span style={{ color: '#d94425' }}>→ Outcome</span>
+        <span style={{ color: T.inkMuted }}>Runner advance</span>
+        {'  '}<span style={{ color: T.inkMuted }}>→ Pickoff</span>
+        {'  '}<span style={{ color: T.inkMuted }}>→ Outcome</span>
       </span>
     );
-    accentBg = '#fff5ee';
-    accentBorder = 'rgba(217, 68, 37, 0.35)';
+    accentBg = T.paper;
+    accentBorder = T.rule;
   } else {
     // 'runner'
     opts = runnerOptions;
-    prompt = 'Runner Advance';
+    prompt = 'Runner advance';
     onSelect = onRunnerSelect;
     breadcrumb = (
       <span>
-        <span style={{ color: '#d94425' }}>Runner Advance</span>
+        <span style={{ color: T.inkMuted }}>Runner advance</span>
       </span>
     );
-    accentBg = '#faf5e8';
-    accentBorder = 'rgba(0,0,0,0.18)';
+    accentBg = T.paper;
+    accentBorder = T.ruleStrong;
   }
 
   return (
@@ -1343,13 +1372,11 @@ const CascadeScreen = ({
         justifyContent: 'space-between',
         marginBottom: '14px',
         paddingBottom: '10px',
-        borderBottom: '1px solid rgba(217, 68, 37, 0.2)',
+        borderBottom: `1px solid ${T.rule}`,
       }}>
         <div style={{
           fontSize: '11px',
-          fontWeight: 700,
-          letterSpacing: '0.08em',
-          textTransform: 'uppercase',
+          fontWeight: 400,
           lineHeight: 1.3,
         }}>
           {breadcrumb}
@@ -1358,13 +1385,11 @@ const CascadeScreen = ({
           onClick={onBack}
           style={{
             background: 'transparent',
-            border: '1px solid rgba(0,0,0,0.18)',
+            border: `1px solid ${T.ruleStrong}`,
             borderRadius: '4px',
             color: '#555',
-            fontSize: '10px',
-            fontWeight: 700,
-            letterSpacing: '0.08em',
-            textTransform: 'uppercase',
+            fontSize: '11px',
+            fontWeight: 400,
             cursor: 'pointer',
             padding: '6px 10px',
             fontFamily: 'inherit',
@@ -1376,21 +1401,23 @@ const CascadeScreen = ({
 
       {/* Stage prompt */}
       <div style={{
-        fontSize: '10px',
-        fontWeight: 700,
-        color: '#d94425',
-        letterSpacing: '0.18em',
-        textTransform: 'uppercase',
+        fontSize: '11px',
+        fontWeight: 400,
+        color: T.inkMuted,
         margin: '0 2px 10px',
         textAlign: 'center',
       }}>
         {prompt}
       </div>
 
-      {/* Large tap-target buttons, one per row. Cascade options (like Batter Out)
-          get a distinctive red text style and a → arrow to signal they open another
-          screen, matching the GameChanger pattern. */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      {/* Full-bleed rows separated by hairlines, like a ruled page. No per-row
+          borders, no cards, no tint -- a row reads as tappable because it is a row.
+          Cascade options no longer carry an arrow; opening another screen is
+          discovered by tapping, and the breadcrumb above says where you are. */}
+      <div style={{
+        display: 'flex', flexDirection: 'column',
+        borderTop: `1px solid ${T.rule}`,
+      }}>
         {opts.map(o => {
           const isCascade = !!o.cascade;
           return (
@@ -1399,14 +1426,16 @@ const CascadeScreen = ({
               onClick={() => onSelect(o.key)}
               style={{
                 width: '100%',
-                background: accentBg,
-                border: `1px solid ${accentBorder}`,
-                borderRadius: '6px',
+                background: 'transparent',
+                border: 'none',
+                borderBottom: `1px solid ${T.rule}`,
+                borderRadius: 0,
+                minHeight: '52px',
                 padding: '18px 14px',
                 fontFamily: 'inherit',
                 fontSize: '15px',
-                fontWeight: 700,
-                color: isCascade ? '#d94425' : '#1a1a1a',
+                fontWeight: 400,
+                color: T.ink,
                 cursor: 'pointer',
                 textAlign: 'left',
                 display: 'flex',
@@ -1415,20 +1444,20 @@ const CascadeScreen = ({
                 transition: 'transform 100ms ease, filter 100ms ease',
               }}
               onPointerDown={(e) => {
-                e.currentTarget.style.transform = 'scale(0.97)';
-                e.currentTarget.style.filter = 'brightness(0.96)';
+                e.currentTarget.style.transform = 'scale(0.99)';
+                e.currentTarget.style.background = T.paperSunk;
               }}
               onPointerUp={(e) => {
                 e.currentTarget.style.transform = 'scale(1)';
-                e.currentTarget.style.filter = 'brightness(1)';
+                e.currentTarget.style.background = 'transparent';
               }}
               onPointerLeave={(e) => {
                 e.currentTarget.style.transform = 'scale(1)';
-                e.currentTarget.style.filter = 'brightness(1)';
+                e.currentTarget.style.background = 'transparent';
               }}
             >
               <span>{o.label}</span>
-              {isCascade && <span style={{ color: '#d94425', fontSize: '16px' }}>→</span>}
+              
             </button>
           );
         })}
@@ -1440,7 +1469,7 @@ const CascadeScreen = ({
 // v1.2 — ExpandedCellView
 // The capture surface that replaces the matrix grid when a cell is tapped.
 // Lives inside the matrix panel footprint (same cream card, same max-width).
-// Three button rows (Pitch / PA Result / Runner Advance) plus an action bar (Undo / Pitching Change).
+// Three button rows (Pitch / PA Result / Runner advance) plus an action bar (Undo / Pitching Change).
 // Pitch taps stay in the cell; PA-end and Runner-advance taps flash the button ~150ms then auto-return.
 // Velocity picker. A thumb-drag scroller rather than a keypad: at youth level the
 // reading is an estimate from the stands, and typing digits between pitches is too
@@ -1483,10 +1512,10 @@ const VeloScroller = ({ min, max, initial, onPick, onSkip, pitchTypeLabel }) => 
 
   return (
     <div>
-      <div style={{ fontSize: '11px', fontWeight: 700, color: '#7a7468', letterSpacing: '0.12em', textTransform: 'uppercase', textAlign: 'center', marginBottom: '2px' }}>
+      <div style={{ fontSize: '11px', fontWeight: 400, color: T.inkMuted, textAlign: 'center', marginBottom: '2px' }}>
         {pitchTypeLabel}
       </div>
-      <div style={{ fontSize: '12px', color: '#a8a294', textAlign: 'center', marginBottom: '10px' }}>
+      <div style={{ fontSize: '12px', color: T.inkFaint, textAlign: 'center', marginBottom: '10px' }}>
         Drag to set speed
       </div>
 
@@ -1495,8 +1524,8 @@ const VeloScroller = ({ min, max, initial, onPick, onSkip, pitchTypeLabel }) => 
           onClick={() => nudge(-1)}
           style={{
             width: '44px', height: '44px', flexShrink: 0, borderRadius: '22px',
-            border: '1px solid rgba(0,0,0,0.15)', background: 'transparent',
-            fontSize: '22px', fontWeight: 700, color: '#7a7468', cursor: 'pointer', fontFamily: 'inherit',
+            border: `1px solid ${T.ruleStrong}`, background: 'transparent',
+            fontSize: '22px', fontWeight: 400, color: T.inkMuted, cursor: 'pointer', fontFamily: 'inherit',
           }}
           aria-label="Decrease"
         >−</button>
@@ -1505,10 +1534,10 @@ const VeloScroller = ({ min, max, initial, onPick, onSkip, pitchTypeLabel }) => 
           {/* Center band marking the selected row */}
           <div style={{
             position: 'absolute', left: 0, right: 0, top: `${pad}px`, height: `${ITEM_H}px`,
-            background: 'rgba(217,68,37,0.08)',
-            borderTop: '1px solid rgba(217,68,37,0.35)',
-            borderBottom: '1px solid rgba(217,68,37,0.35)',
-            borderRadius: '6px', pointerEvents: 'none', zIndex: 1,
+            background: 'transparent',
+            borderTop: `1px solid ${T.ruleStrong}`,
+            borderBottom: `1px solid ${T.ruleStrong}`,
+            borderRadius: 0, pointerEvents: 'none', zIndex: 1,
           }} />
           <div
             ref={scrollRef}
@@ -1527,8 +1556,9 @@ const VeloScroller = ({ min, max, initial, onPick, onSkip, pitchTypeLabel }) => 
                   height: `${ITEM_H}px`, scrollSnapAlign: 'center',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: i === idx ? '30px' : '20px',
-                  fontWeight: i === idx ? 800 : 600,
-                  color: i === idx ? '#1a1a1a' : 'rgba(0,0,0,0.28)',
+                  fontWeight: i === idx ? 500 : 400,
+                  color: i === idx ? T.ink : T.inkPlaceholder,
+                  fontVariantNumeric: 'tabular-nums',
                   fontVariantNumeric: 'tabular-nums',
                   transition: 'font-size 90ms linear, color 90ms linear',
                 }}
@@ -1542,8 +1572,8 @@ const VeloScroller = ({ min, max, initial, onPick, onSkip, pitchTypeLabel }) => 
           onClick={() => nudge(1)}
           style={{
             width: '44px', height: '44px', flexShrink: 0, borderRadius: '22px',
-            border: '1px solid rgba(0,0,0,0.15)', background: 'transparent',
-            fontSize: '22px', fontWeight: 700, color: '#7a7468', cursor: 'pointer', fontFamily: 'inherit',
+            border: `1px solid ${T.ruleStrong}`, background: 'transparent',
+            fontSize: '22px', fontWeight: 400, color: T.inkMuted, cursor: 'pointer', fontFamily: 'inherit',
           }}
           aria-label="Increase"
         >+</button>
@@ -1553,15 +1583,15 @@ const VeloScroller = ({ min, max, initial, onPick, onSkip, pitchTypeLabel }) => 
         <button
           onClick={() => onPick(values[idx])}
           style={{
-            width: '100%', padding: '15px', background: '#d94425', color: '#fff', border: 'none',
-            borderRadius: '8px', fontFamily: 'inherit', fontSize: '15px', fontWeight: 800, cursor: 'pointer',
+            width: '100%', padding: '15px', background: T.ink, color: T.paperRaised, border: 'none',
+            borderRadius: '8px', fontFamily: 'inherit', fontSize: '15px', fontWeight: 600, cursor: 'pointer',
           }}
         >Log {values[idx]} mph</button>
         <button
           onClick={onSkip}
           style={{
-            width: '100%', padding: '11px', background: 'transparent', color: '#7a7468', border: 'none',
-            fontFamily: 'inherit', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+            width: '100%', padding: '11px', background: 'transparent', color: T.inkMuted, border: 'none',
+            fontFamily: 'inherit', fontSize: '13px', fontWeight: 500, cursor: 'pointer',
           }}
         >No reading — skip speed</button>
       </div>
@@ -1594,7 +1624,7 @@ const ExpandedCellView = ({
   onVeloRecorded,
 }) => {
   // Local flash state for buttons whose flash is purely visual (Pitch row, Undo).
-  // PA Result and Runner Advance use the parent-level `flashingButton` because their
+  // PA Result and Runner advance use the parent-level `flashingButton` because their
   // flash is tied to the auto-return-to-matrix behavior.
   const [localFlash, setLocalFlash] = React.useState(null);
   const flashLocally = (key) => {
@@ -1650,13 +1680,15 @@ const ExpandedCellView = ({
 
   // Common button styles
   const baseBtnStyle = {
-    border: '1px solid rgba(0,0,0,0.12)',
-    borderRadius: '5px',
+    border: 'none',
+    borderRight: `1px solid ${T.rule}`,
+    borderBottom: `1px solid ${T.rule}`,
+    borderRadius: 0,
     padding: '14px 4px',
     fontFamily: 'inherit',
-    fontSize: '12px',
-    fontWeight: 700,
-    color: '#1a1a1a',
+    fontSize: '15px',
+    fontWeight: 400,
+    color: T.ink,
     cursor: 'pointer',
     textAlign: 'center',
     lineHeight: 1.15,
@@ -1665,15 +1697,15 @@ const ExpandedCellView = ({
     alignItems: 'center',
     justifyContent: 'center',
     transition: 'transform 100ms ease, filter 100ms ease, box-shadow 200ms ease',
-    background: '#fff',
+    background: 'transparent',
   };
   const flashStyle = {
-    transform: 'scale(0.92)',
-    filter: 'brightness(1.4)',
-    boxShadow: '0 0 14px rgba(217, 68, 37, 0.55)',
-    background: '#d94425',
-    color: '#fff',
-    borderColor: '#c63a1d',
+    transform: 'scale(0.97)',
+    filter: 'none',
+    boxShadow: `0 0 14px ${T.rule}`,
+    background: T.ink,
+    color: T.paperRaised,
+    borderColor: T.ink,
   };
 
   const isFlashing = (row, key) =>
@@ -1682,42 +1714,42 @@ const ExpandedCellView = ({
   // Pitch row
   const pitchButtons = [
     { key: 'ball', label: 'Ball' },
-    { key: 'called_strike', label: <>Called<br />Strike</> },
-    { key: 'swing_miss', label: <>Swing &amp;<br />Miss</> },
+    { key: 'called_strike', label: <>Called<br />strike</> },
+    { key: 'swing_miss', label: <>Swing &amp;<br />miss</> },
     { key: 'foul', label: 'Foul' },
   ];
   // Top-level PA Result dropdown. v1.4 cascading model:
   //   - 'ball_in_play' cascades into a 2nd dropdown for batted-ball type, then a
-  //     3rd dropdown for outcome (Hit / Out / Reached on Error). The scorer
+  //     3rd dropdown for outcome (Hit / Out / Reached on error). The scorer
   //     never directly fires a ball_in_play event — only the leaf outcome fires.
-  //   - Walk, Strikeout types, Dropped Third Strike, Other commit immediately.
+  //   - Walk, Strikeout types, Dropped third strike, Other commit immediately.
   const paOptions = [
-    { key: 'ball_in_play',          label: 'Ball in Play',          cascade: true },
+    { key: 'ball_in_play',          label: 'Ball in play',          cascade: true },
     { key: 'walk',                  label: 'Walk' },
-    { key: 'strikeout_called',      label: 'Strikeout — Called' },
-    { key: 'strikeout_swinging',    label: 'Strikeout — Swinging' },
-    { key: 'hit_by_pitch',          label: 'Hit by Pitch' },
-    { key: 'intentional_walk',      label: 'Intentional Walk' },
-    { key: 'dropped_third_strike',  label: 'Dropped Third Strike' },
-    { key: 'batter_out',            label: 'Batter Out (Interference)' },
+    { key: 'strikeout_called',      label: 'Strikeout — called' },
+    { key: 'strikeout_swinging',    label: 'Strikeout — swinging' },
+    { key: 'hit_by_pitch',          label: 'Hit by pitch' },
+    { key: 'intentional_walk',      label: 'Intentional walk' },
+    { key: 'dropped_third_strike',  label: 'Dropped third strike' },
+    { key: 'batter_out',            label: 'Batter out (Interference)' },
     { key: 'other',                 label: 'Other' },
   ];
   // 2nd-level cascade: batted-ball type. Selected after 'ball_in_play'.
-  // v1.5: Pop Fly added (infield pop-up; distinct from outfield Fly Ball for defensive
+  // v1.5: Pop fly added (infield pop-up; distinct from outfield Fly ball for defensive
   // credit and scoring — an IF pop-up caught by 2B is different from a CF flyout).
-  // Hard Ground Ball was dropped — over-granular for live tagging; existing events
+  // Hard Ground ball was dropped — over-granular for live tagging; existing events
   // with hard_ground_ball remain valid.
   const battedBallOptions = [
-    { key: 'ground_ball',      label: 'Ground Ball' },
-    { key: 'fly_ball',         label: 'Fly Ball' },
-    { key: 'pop_fly',          label: 'Pop Fly' },
-    { key: 'line_drive',       label: 'Line Drive' },
+    { key: 'ground_ball',      label: 'Ground ball' },
+    { key: 'fly_ball',         label: 'Fly ball' },
+    { key: 'pop_fly',          label: 'Pop fly' },
+    { key: 'line_drive',       label: 'Line drive' },
     { key: 'bunt',             label: 'Bunt' },
   ];
   // 3rd-level cascade: outcome of the batted ball. v1.5 — type-specific menus.
   // Different batted-ball types produce different outcome distributions, so each type
   // has its own menu. Common outcomes (single/double/triple/HR/error) appear across
-  // most types; type-specific outcomes (Fielder's Choice on grounders, etc.) appear
+  // most types; type-specific outcomes (Fielder's choice on grounders, etc.) appear
   // only where they're possible.
   //
   // Hits keep the unified category 'hit' on the pa_end event but gain a hitType field
@@ -1725,68 +1757,68 @@ const ExpandedCellView = ({
   // analytics simple — every hit groups by category === 'hit' — but preserves the
   // granularity the cascade collects.
   //
-  // v1.5 step 5: Batter Out now cascades to a type-specific sub-screen (Out at 1st,
-  // Double Play, Fly Out, Sac Fly, Line Out, Sacrifice Bunt). Foul Ball added where
+  // v1.5 step 5: Batter out now cascades to a type-specific sub-screen (Out at 1st,
+  // Double Play, Fly Out, Sac Fly, Line Out, Sacrifice Bunt). Foul ball added where
   // relevant; it's not a PA-end — it fires the same path as the Foul pitch button.
   // B. Interference deliberately not in the cascade — too rare for a dedicated path;
   // scorers route through Other in the top-level PA Result menu.
   const bipOutcomesByType = {
     ground_ball: [
-      { key: 'batter_out_cascade', label: 'Batter Out',         cascade: true },
+      { key: 'batter_out_cascade', label: 'Batter out',         cascade: true },
       { key: 'single',             label: 'Single',             hitType: 'single' },
       { key: 'double',             label: 'Double',             hitType: 'double' },
       { key: 'triple',             label: 'Triple',             hitType: 'triple' },
-      { key: 'in_park_hr',         label: 'In-the-park HR',     hitType: 'in_park_hr' },
-      { key: 'fielders_choice',    label: "Fielder's Choice" },
-      { key: 'reached_on_error',   label: 'Reached on Error' },
-      { key: 'foul_ball_bip',      label: 'Foul Ball',          foulPitch: true },
+      { key: 'in_park_hr',         label: 'In-the-park home run',     hitType: 'in_park_hr' },
+      { key: 'fielders_choice',    label: "Fielder's choice" },
+      { key: 'reached_on_error',   label: 'Reached on error' },
+      { key: 'foul_ball_bip',      label: 'Foul ball',          foulPitch: true },
     ],
     hard_ground_ball: [
-      { key: 'batter_out_cascade', label: 'Batter Out',         cascade: true },
+      { key: 'batter_out_cascade', label: 'Batter out',         cascade: true },
       { key: 'single',             label: 'Single',             hitType: 'single' },
       { key: 'double',             label: 'Double',             hitType: 'double' },
       { key: 'triple',             label: 'Triple',             hitType: 'triple' },
-      { key: 'in_park_hr',         label: 'In-the-park HR',     hitType: 'in_park_hr' },
-      { key: 'fielders_choice',    label: "Fielder's Choice" },
-      { key: 'reached_on_error',   label: 'Reached on Error' },
-      { key: 'foul_ball_bip',      label: 'Foul Ball',          foulPitch: true },
+      { key: 'in_park_hr',         label: 'In-the-park home run',     hitType: 'in_park_hr' },
+      { key: 'fielders_choice',    label: "Fielder's choice" },
+      { key: 'reached_on_error',   label: 'Reached on error' },
+      { key: 'foul_ball_bip',      label: 'Foul ball',          foulPitch: true },
     ],
     fly_ball: [
-      { key: 'batter_out_cascade', label: 'Batter Out',         cascade: true },
+      { key: 'batter_out_cascade', label: 'Batter out',         cascade: true },
       { key: 'single',             label: 'Single',             hitType: 'single' },
       { key: 'double',             label: 'Double',             hitType: 'double' },
       { key: 'triple',             label: 'Triple',             hitType: 'triple' },
-      { key: 'home_run',           label: 'Home Run',           hitType: 'home_run' },
-      { key: 'in_park_hr',         label: 'In-the-park HR',     hitType: 'in_park_hr' },
-      { key: 'reached_on_error',   label: 'Reached on Error' },
-      { key: 'foul_ball_bip',      label: 'Foul Ball',          foulPitch: true },
+      { key: 'home_run',           label: 'Home run',           hitType: 'home_run' },
+      { key: 'in_park_hr',         label: 'In-the-park home run',     hitType: 'in_park_hr' },
+      { key: 'reached_on_error',   label: 'Reached on error' },
+      { key: 'foul_ball_bip',      label: 'Foul ball',          foulPitch: true },
     ],
     pop_fly: [
-      { key: 'batter_out_cascade', label: 'Batter Out',         cascade: true },
+      { key: 'batter_out_cascade', label: 'Batter out',         cascade: true },
       { key: 'single',             label: 'Single',             hitType: 'single' },
       { key: 'double',             label: 'Double',             hitType: 'double' },
       { key: 'triple',             label: 'Triple',             hitType: 'triple' },
-      { key: 'reached_on_error',   label: 'Reached on Error' },
-      { key: 'foul_ball_bip',      label: 'Foul Ball',          foulPitch: true },
+      { key: 'reached_on_error',   label: 'Reached on error' },
+      { key: 'foul_ball_bip',      label: 'Foul ball',          foulPitch: true },
     ],
     line_drive: [
-      { key: 'batter_out_cascade', label: 'Batter Out',         cascade: true },
+      { key: 'batter_out_cascade', label: 'Batter out',         cascade: true },
       { key: 'single',             label: 'Single',             hitType: 'single' },
       { key: 'double',             label: 'Double',             hitType: 'double' },
       { key: 'triple',             label: 'Triple',             hitType: 'triple' },
-      { key: 'home_run',           label: 'Home Run',           hitType: 'home_run' },
-      { key: 'in_park_hr',         label: 'In-the-park HR',     hitType: 'in_park_hr' },
-      { key: 'reached_on_error',   label: 'Reached on Error' },
+      { key: 'home_run',           label: 'Home run',           hitType: 'home_run' },
+      { key: 'in_park_hr',         label: 'In-the-park home run',     hitType: 'in_park_hr' },
+      { key: 'reached_on_error',   label: 'Reached on error' },
     ],
     bunt: [
-      { key: 'batter_out_cascade', label: 'Batter Out',         cascade: true },
+      { key: 'batter_out_cascade', label: 'Batter out',         cascade: true },
       { key: 'single',             label: 'Single',             hitType: 'single' },
       { key: 'double',             label: 'Double',             hitType: 'double' },
-      { key: 'reached_on_error',   label: 'Reached on Error' },
-      { key: 'foul_ball_bip',      label: 'Foul Ball',          foulPitch: true },
+      { key: 'reached_on_error',   label: 'Reached on error' },
+      { key: 'foul_ball_bip',      label: 'Foul ball',          foulPitch: true },
     ],
   };
-  // Type-specific Batter Out sub-cascade menus. Each leaf fires a pa_end with a
+  // Type-specific Batter out sub-cascade menus. Each leaf fires a pa_end with a
   // specific out category. All carry the batted-ball type forward on the pa_end event.
   const batterOutOptionsByType = {
     ground_ball: [
@@ -1827,14 +1859,14 @@ const ExpandedCellView = ({
     }
     return bipOutcomesByType.ground_ball;
   };
-  // Helper: resolve the Batter Out sub-cascade menu for the current batted-ball type.
+  // Helper: resolve the Batter out sub-cascade menu for the current batted-ball type.
   const getCurrentBatterOutOptions = () => {
     if (cascadeBattedBall && batterOutOptionsByType[cascadeBattedBall]) {
       return batterOutOptionsByType[cascadeBattedBall];
     }
     return batterOutOptionsByType.ground_ball;
   };
-  // Runner Advance dropdown options.
+  // Runner advance dropdown options.
   // None of these log an implicit pitch — they're between-pitch events.
   const runnerOptions = [
     { key: 'stolen_base',           label: 'Stolen Base' },
@@ -1866,14 +1898,14 @@ const ExpandedCellView = ({
   //   'pa_top'           = full takeover, all top-level PA Result options
   //   'bip_type'         = full takeover, BIP cascade level 2 (Ground / Fly / Line / Bunt / etc.)
   //   'bip_outcome'      = full takeover, BIP cascade level 3 (Hit / Out / Error / etc., type-specific)
-  //   'bip_batter_out'   = full takeover, BIP cascade level 4 — Batter Out sub-cascade (Out at 1st / DP / etc.)
+  //   'bip_batter_out'   = full takeover, BIP cascade level 4 — Batter out sub-cascade (Out at 1st / DP / etc.)
   //   'bip_fielders'     = full takeover, BIP cascade level 5 — Fielder picker (v1.5 step 6)
-  //   'runner'           = full takeover, Runner Advance options
+  //   'runner'           = full takeover, Runner advance options
   const [cascadeStage, setCascadeStage] = React.useState(null);
   const [cascadeBattedBall, setCascadeBattedBall] = React.useState(null);
   // "More pitch" cascade — catch-all for low-frequency pitch events that don't
-  // earn space on the main pitch row: Bunt Attempt, Balk, Hit By Pitch,
-  // Intentional Ball. Opened by tapping the mound. Closed by selecting an option
+  // earn space on the main pitch row: Bunt attempt, Balk, Hit by pitch,
+  // Intentional ball. Opened by tapping the mound. Closed by selecting an option
   // or tapping outside the popover.
   const [morePitchOpen, setMorePitchOpen] = React.useState(false);
   // Ball-4 / strike-3 confirmation. Tapping the pitch that would end the PA fires a
@@ -1884,20 +1916,22 @@ const ExpandedCellView = ({
   // scorer picks pitch type, then velocity.
   // null | { pitchKey, stage: 'type'|'velo', pitchType, paEnd }
   const [pitchDetail, setPitchDetail] = React.useState(null);
-  // Bunt Attempt is a two-step within the more-cascade: tap Bunt Attempt → ask
+  // Bunt attempt is a two-step within the more-cascade: tap Bunt attempt → ask
   // "How did it resolve?" (Strike / Foul / In Play). Tracked as a sub-stage.
   const [moreSubStage, setMoreSubStage] = React.useState(null); // null | 'bunt_resolve'
 
   // Shared button style for items inside the more-pitch popover.
   const moreItemStyle = {
-    background: '#fff',
-    border: '1px solid rgba(0,0,0,0.18)',
-    borderRadius: '8px',
-    padding: '14px 14px',
+    background: 'transparent',
+    border: 'none',
+    borderBottom: `1px solid ${T.rule}`,
+    borderRadius: 0,
+    padding: '16px 14px',
+    minHeight: '52px',
     fontFamily: 'inherit',
-    fontSize: '14px',
-    fontWeight: 700,
-    color: '#1a1a1a',
+    fontSize: '15px',
+    fontWeight: 400,
+    color: T.ink,
     cursor: 'pointer',
     textAlign: 'left',
   };
@@ -1906,7 +1940,7 @@ const ExpandedCellView = ({
   //                       only when the scorer taps Done. extras include battedBall, hitType.
   //   fielderSequence  = positions tapped so far in order, e.g. ['3B', '1B'] for a 5-3.
   const [pendingPa, setPendingPa] = React.useState(null);
-  // Pitch type / velocity captured when Ball in Play was tapped, held until the
+  // Pitch type / velocity captured when Ball in play was tapped, held until the
   // cascade resolves and merged into whatever it produces. Null when detail is off,
   // skipped, or the scorer backed out of the cascade.
   const [bipPitchInfo, setBipPitchInfo] = React.useState(null);
@@ -1953,7 +1987,7 @@ const ExpandedCellView = ({
     setTouchedRunners(new Set());
   };
 
-  // v1.5 — Runner Advance flow state. When the scorer taps a runner-advance
+  // v1.5 — Runner advance flow state. When the scorer taps a runner-advance
   // category (Stolen Base / Caught Stealing / Battery Error / Pickoff / Other),
   // the flow now routes through:
   //   1. (SB/CS/BE only) pitch sub-cascade — capture the pitch that coincided
@@ -1966,14 +2000,14 @@ const ExpandedCellView = ({
   // pendingRunnerAdvance holds { category, pitch? } across these stages.
   const [pendingRunnerAdvance, setPendingRunnerAdvance] = React.useState(null);
 
-  // Tap on the "Plate Appearance Result" button in the normal cell view → open pa_top.
+  // Tap on the "Plate appearance" button in the normal cell view → open pa_top.
   const onOpenPaTakeover = () => setCascadeStage('pa_top');
-  // Tap on the "Ball in Play" quick button in the pitch row → jump straight to bip_type,
+  // Tap on the "Ball in play" quick button in the pitch row → jump straight to bip_type,
   // skipping the pa_top takeover. Saves one tap on the most common cascade entry.
   // From bip_type, the Back button still lands on pa_top, so the scorer can correct
   // a mis-tap by backing up into the full PA Result menu.
-  // Ball in Play asks for pitch detail on the tap, same as Ball / Called Strike /
-  // Swing & Miss / Foul, so the prompt order is identical everywhere in the app.
+  // Ball in play asks for pitch detail on the tap, same as Ball / Called strike /
+  // Swing & miss / Foul, so the prompt order is identical everywhere in the app.
   // The answer is parked in bipPitchInfo and merged in when the cascade resolves.
   const onOpenBipQuick = () => {
     setBipPitchInfo(null);
@@ -1983,7 +2017,7 @@ const ExpandedCellView = ({
     }
     setCascadeStage('bip_type');
   };
-  // Tap on the "Runner Advance" button in the normal cell view → open runner takeover.
+  // Tap on the "Runner advance" button in the normal cell view → open runner takeover.
   const onOpenRunnerTakeover = () => setCascadeStage('runner');
 
   // ── 2B: idle diamond (inverted runner-advance) ──────────────────────────────
@@ -2075,11 +2109,11 @@ const ExpandedCellView = ({
   };
 
 
-  // Selection from the top-level PA takeover. Ball in Play cascades; everything else fires.
+  // Selection from the top-level PA takeover. Ball in play cascades; everything else fires.
   // All leaves (Walk, HBP, Strikeout types, Other) fire as their category directly.
-  // Home Run is no longer a top-level leaf — it lives in the BIP cascade under Fly Ball
-  // and Line Drive types.
-  // Dropped Third Strike is the exception — it routes through the diamond so the scorer
+  // Home run is no longer a top-level leaf — it lives in the BIP cascade under Fly ball
+  // and Line drive types.
+  // Dropped third strike is the exception — it routes through the diamond so the scorer
   // can mark the batter safe at 1B (rare reach case) or capture the fielder sequence
   // when the catcher recovers and throws to 1B.
   const onPaTopLevelSelect = (key) => {
@@ -2161,7 +2195,7 @@ const ExpandedCellView = ({
       // PA-ending pitch: the parent logs the implicit closing pitch, so detail rides
       // along in extras rather than through onPitchTap. paEndExtras carries whatever
       // the cascade already resolved (batted ball, fielder string, runner movements)
-      // so a Ball in Play keeps its whole play when the detail lands on top.
+      // so a Ball in play keeps its whole play when the detail lands on top.
       onPaEndTap(pd.paEnd, {
         ...(pd.paEndExtras || {}),
         pitchType: pitchType || undefined,
@@ -2172,7 +2206,7 @@ const ExpandedCellView = ({
     }
   };
 
-  // Every Ball in Play exit funnels through here so the detail captured on the tap
+  // Every Ball in play exit funnels through here so the detail captured on the tap
   // rides in on the resolved play, whichever branch of the cascade produced it.
   const firePaEndWithDetail = (category, extras) => {
     const info = bipPitchInfo;
@@ -2196,10 +2230,10 @@ const ExpandedCellView = ({
   // specific runners who didn't follow the default.
   //
   // Default advancement rules:
-  //   Single (and FC, Reached on Error): everyone +1 base (batter to 1B, runners shift)
+  //   Single (and FC, Reached on error): everyone +1 base (batter to 1B, runners shift)
   //   Double:                            everyone +2 bases
   //   Triple:                            everyone +3 bases
-  //   Home Run / In-park HR:             everyone scores (including batter)
+  //   Home run / In-park HR:             everyone scores (including batter)
   //   Walk / HBP:                        forced runners only (batter to 1B, +1 only when
   //                                       the trailing base would be occupied otherwise)
   //   Out at 1st:                        batter out at 1B, runners stay
@@ -2263,7 +2297,7 @@ const ExpandedCellView = ({
     // problems than it solves.
     //
     // RULES-DRIVEN (auto-populated):
-    //   Home Run / In-Park HR:     all runners score (forced by rules — every
+    //   Home run / In-Park HR:     all runners score (forced by rules — every
     //                              baserunner including the batter touches home)
     //   Walk / HBP / IBB:          forced runners only (chain forcing per rules)
     //   Sac Fly:                   runner from 3B scores (definitional — if they
@@ -2282,7 +2316,7 @@ const ExpandedCellView = ({
     // JUDGMENT-DRIVEN (no advancement assumption — runners stay; scorer places):
     //   Single / Double / Triple:  no auto-advance. Scorer places every runner.
     //   FC (no forceoutBase set):  no auto-advance for runners; only batter at 1B
-    //   Reached on Error:          no auto-advance. Scorer places every runner.
+    //   Reached on error:          no auto-advance. Scorer places every runner.
     //   Sac Bunt:                  no auto-advance. Scorer places (typically all +1
     //                              but can vary).
     //   Other:                     no auto-advance. Scorer places.
@@ -2453,8 +2487,8 @@ const ExpandedCellView = ({
   // (step 6) rather than firing immediately — the picker captures the fielder
   // sequence, then commits the PA-end when the scorer taps Done.
   // Exceptions:
-  //   - Batter Out → opens the bip_batter_out sub-cascade (still cascades deeper)
-  //   - Foul Ball  → logs a foul pitch and exits cascade (not a PA-end)
+  //   - Batter out → opens the bip_batter_out sub-cascade (still cascades deeper)
+  //   - Foul ball  → logs a foul pitch and exits cascade (not a PA-end)
   const onCascadeOutcomeSelect = (key) => {
     if (!key) return;
     const battedBall = cascadeBattedBall;
@@ -2470,14 +2504,14 @@ const ExpandedCellView = ({
       return;
     }
 
-    // Batter Out → opens the type-specific sub-cascade. Don't reset battedBall yet —
+    // Batter out → opens the type-specific sub-cascade. Don't reset battedBall yet —
     // the sub-cascade needs it to resolve its own menu and stamp the pa_end event.
     if (opt.cascade && key === 'batter_out_cascade') {
       setCascadeStage('bip_batter_out');
       return;
     }
 
-    // Foul Ball inside BIP — not a PA-end. The scorer entered the cascade but the
+    // Foul ball inside BIP — not a PA-end. The scorer entered the cascade but the
     // ball went foul. Behave exactly like tapping the Foul pitch button: log a
     // foul pitch event, exit the cascade, return to the cell. At-bat continues.
     if (opt.foulPitch) {
@@ -2489,7 +2523,7 @@ const ExpandedCellView = ({
       return;
     }
 
-    // No-fielders short-circuit — Home Run inside BIP fires immediately, no picker.
+    // No-fielders short-circuit — Home run inside BIP fires immediately, no picker.
     // Ball left the park; no fielder touched it before it cleared the fence.
     if (opt.noFielders) {
       setCascadeStage(null);
@@ -2518,7 +2552,7 @@ const ExpandedCellView = ({
     }
     const paInfo = { category, extras };
 
-    // v1.5 — Fielder's Choice with bases loaded or 1st & 2nd opens a forceout-location
+    // v1.5 — Fielder's choice with bases loaded or 1st & 2nd opens a forceout-location
     // sub-cascade first. The location determines which runner got out and (for bases
     // loaded) whether the run from 3B scored. Other FC states use single-equivalent
     // pre-population by default.
@@ -2554,7 +2588,7 @@ const ExpandedCellView = ({
     setTouchedRunners(new Set());
     setCascadeStage('bip_fielders');
   };
-  // BIP cascade level 4 (Batter Out sub-cascade): out type chosen. Routes into the
+  // BIP cascade level 4 (Batter out sub-cascade): out type chosen. Routes into the
   // fielder picker just like the level-3 leaves; the PA fires when Done is tapped.
   const onCascadeBatterOutSelect = (key) => {
     if (!key) return;
@@ -2788,7 +2822,7 @@ const ExpandedCellView = ({
       runnerMovements,
     });
   };
-  // Selection from the Runner Advance takeover.
+  // Selection from the Runner advance takeover.
   // v1.5 — Routes through pitch sub-cascade (for SB/CS/BE) or directly to the
   // diamond (for Pickoff/Other), instead of firing immediately.
   const onRunnerSelect = (key) => {
@@ -3006,7 +3040,7 @@ const ExpandedCellView = ({
   const onCascadeBack = () => {
     if (cascadeStage === 'bip_fielders') {
       // Determine which stage the scorer came from. If the pending PA's category
-      // matches one of the Batter Out sub-cascade keys, return to bip_batter_out;
+      // matches one of the Batter out sub-cascade keys, return to bip_batter_out;
       // otherwise return to bip_outcome.
       // If the pending PA is an FC with a forceoutBase set, the scorer came through
       // the FC forceout sub-cascade — return there instead of the outcome menu.
@@ -3182,9 +3216,9 @@ const ExpandedCellView = ({
       />
 
       {/* "More pitch" cascade — catch-all popover for low-frequency events.
-          Opened by tapping the MORE button on the mound. Items: Bunt Attempt
+          Opened by tapping the MORE button on the mound. Items: Bunt attempt
           (which expands to Strike/Foul/In Play), Balk (auto-advance +1 each
-          runner), Hit By Pitch (PA-end via existing handler), Intentional Ball
+          runner), Hit by pitch (PA-end via existing handler), Intentional ball
           (counts toward IBB; 4th IB fires intentional_walk PA-end automatically). */}
       {pitchDetail && (() => {
         const isSoftball = sport === 'Softball';
@@ -3197,34 +3231,40 @@ const ExpandedCellView = ({
           <div
             onClick={() => { setPitchDetail(null); setBipPitchInfo(null); }}
             style={{
-              position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
+              position: 'fixed', inset: 0, background: T.scrim,
               display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 65, padding: '20px',
             }}
           >
             <div
               onClick={(e) => e.stopPropagation()}
               style={{
-                background: '#fdfaf2', borderRadius: '12px', padding: '18px',
-                maxWidth: '340px', width: '100%', boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
+                background: T.paperRaised, borderRadius: '12px', padding: '18px',
+                maxWidth: '340px', width: '100%', boxShadow: `0 10px 30px ${T.scrim}`,
               }}
             >
               {pitchDetail.stage === 'type' ? (
                 <>
-                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#d94425', letterSpacing: '0.14em', textTransform: 'uppercase', textAlign: 'center', marginBottom: '2px' }}>
-                    Pitch Type
+                  <div style={{ fontSize: '11px', fontWeight: 400, color: T.inkMuted, textAlign: 'center', marginBottom: '2px' }}>
+                    Pitch type
                   </div>
-                  <div style={{ fontSize: '12px', color: '#a8a294', textAlign: 'center', marginBottom: '14px' }}>
+                  <div style={{ fontSize: '12px', color: T.inkFaint, textAlign: 'center', marginBottom: '14px' }}>
                     Your read — best guess is fine
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  <div style={{
+                    display: 'grid', gridTemplateColumns: '1fr 1fr',
+                    borderTop: `1px solid ${T.rule}`, borderLeft: `1px solid ${T.rule}`,
+                  }}>
                     {types.map(t => (
                       <button
                         key={t}
                         onClick={() => setPitchDetail(pd => ({ ...pd, pitchType: t, stage: 'velo' }))}
                         style={{
-                          padding: '16px 8px', background: '#fff5ee',
-                          border: '1px solid rgba(217,68,37,0.35)', borderRadius: '8px',
-                          fontFamily: 'inherit', fontSize: '14px', fontWeight: 700, color: '#1a1a1a',
+                          padding: '16px 8px', background: 'transparent',
+                          border: 'none',
+                          borderRight: `1px solid ${T.rule}`,
+                          borderBottom: `1px solid ${T.rule}`,
+                          borderRadius: 0,
+                          fontFamily: 'inherit', fontSize: '15px', fontWeight: 400, color: T.ink,
                           cursor: 'pointer', minHeight: '54px',
                         }}
                       >{t}</button>
@@ -3234,8 +3274,8 @@ const ExpandedCellView = ({
                     onClick={() => commitPitchDetail(null, null)}
                     style={{
                       width: '100%', padding: '11px', marginTop: '12px', background: 'transparent',
-                      color: '#7a7468', border: 'none', fontFamily: 'inherit', fontSize: '13px',
-                      fontWeight: 600, cursor: 'pointer',
+                      color: T.inkMuted, border: 'none', fontFamily: 'inherit', fontSize: '13px',
+                      fontWeight: 500, cursor: 'pointer',
                     }}
                   >Didn't catch it — log {pitchDetail.pitchKey === 'in_play' ? 'play' : 'pitch'} only</button>
                 </>
@@ -3258,21 +3298,21 @@ const ExpandedCellView = ({
         <div
           onClick={() => setPitchEndConfirm(null)}
           style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
+            position: 'fixed', inset: 0, background: T.scrim,
             display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 60, padding: '20px',
           }}
         >
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              background: '#fdfaf2', borderRadius: '12px', padding: '20px',
-              maxWidth: '320px', width: '100%', boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
+              background: T.paperRaised, borderRadius: '12px', padding: '20px',
+              maxWidth: '320px', width: '100%', boxShadow: `0 10px 30px ${T.scrim}`,
             }}
           >
-            <div style={{ fontSize: '15px', fontWeight: 800, color: '#1a1a1a', marginBottom: '4px' }}>
+            <div style={{ fontSize: '15px', fontWeight: 400, color: T.ink, marginBottom: '4px' }}>
               {pitchEndConfirm.kind === 'walk' ? 'Ball four — walk?' : 'Strike three?'}
             </div>
-            <div style={{ fontSize: '12px', color: '#7a7468', marginBottom: '16px', lineHeight: 1.4 }}>
+            <div style={{ fontSize: '12px', color: T.inkMuted, marginBottom: '16px', lineHeight: 1.4 }}>
               {pitchEndConfirm.kind === 'walk'
                 ? 'Confirm the walk, or cancel if it was a mistap.'
                 : 'Confirm the strikeout, or tag a dropped third strike.'}
@@ -3285,8 +3325,8 @@ const ExpandedCellView = ({
                     if (pitchDetailOn) setPitchDetail({ pitchKey: 'ball', stage: 'type', pitchType: null, paEnd: 'walk' });
                     else onPaEndTap('walk');
                   }}
-                  style={{ width: '100%', padding: '14px', background: '#d94425', color: '#fff', border: 'none', borderRadius: '8px', fontFamily: 'inherit', fontSize: '14px', fontWeight: 800, cursor: 'pointer' }}
-                >Confirm Walk</button>
+                  style={{ width: '100%', padding: '14px', background: T.ink, color: T.paperRaised, border: 'none', borderRadius: '8px', fontFamily: 'inherit', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}
+                >Confirm walk</button>
               ) : (
                 <>
                   <button
@@ -3297,17 +3337,17 @@ const ExpandedCellView = ({
                       if (pitchDetailOn) setPitchDetail({ pitchKey: pk, stage: 'type', pitchType: null, paEnd: cat });
                       else onPaEndTap(cat);
                     }}
-                    style={{ width: '100%', padding: '14px', background: '#d94425', color: '#fff', border: 'none', borderRadius: '8px', fontFamily: 'inherit', fontSize: '14px', fontWeight: 800, cursor: 'pointer' }}
-                  >Confirm Strikeout</button>
+                    style={{ width: '100%', padding: '14px', background: T.ink, color: T.paperRaised, border: 'none', borderRadius: '8px', fontFamily: 'inherit', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}
+                  >Confirm strikeout</button>
                   <button
                     onClick={() => { setPitchEndConfirm(null); onPaTopLevelSelect('dropped_third_strike'); }}
-                    style={{ width: '100%', padding: '14px', background: 'transparent', color: '#d94425', border: '1px solid #d94425', borderRadius: '8px', fontFamily: 'inherit', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}
-                  >Dropped Third Strike</button>
+                    style={{ width: '100%', padding: '14px', background: 'transparent', color: T.ink, border: `1px solid ${T.rule}`, borderRadius: '8px', fontFamily: 'inherit', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}
+                  >Dropped third strike</button>
                 </>
               )}
               <button
                 onClick={() => setPitchEndConfirm(null)}
-                style={{ width: '100%', padding: '10px', background: 'transparent', color: '#7a7468', border: 'none', fontFamily: 'inherit', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
+                style={{ width: '100%', padding: '10px', background: 'transparent', color: T.inkMuted, border: 'none', fontFamily: 'inherit', fontSize: '13px', fontWeight: 400, cursor: 'pointer' }}
               >Cancel — mistap</button>
             </div>
           </div>
@@ -3320,7 +3360,7 @@ const ExpandedCellView = ({
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.35)',
+            background: T.scrim,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -3330,16 +3370,16 @@ const ExpandedCellView = ({
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              background: '#fdfaf2',
+              background: T.paperRaised,
               borderRadius: '12px',
               padding: '14px',
               minWidth: '260px',
               maxWidth: '320px',
-              boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
+              boxShadow: `0 10px 30px ${T.scrim}`,
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-              <span style={{ fontSize: '11px', fontWeight: 800, letterSpacing: '0.18em', color: '#d94425', textTransform: 'uppercase' }}>
+              <span style={{ fontSize: '11px', fontWeight: 400, color: T.inkMuted }}>
                 {moreSubStage === 'bunt_resolve' ? 'Bunt — how?' : moreSubStage === 'end_inning_reason' ? 'End inning — why?' : 'Pitch'}
               </span>
               <button
@@ -3347,9 +3387,9 @@ const ExpandedCellView = ({
                 style={{
                   background: 'transparent',
                   border: 'none',
-                  color: '#7a7468',
+                  color: T.inkMuted,
                   fontSize: '13px',
-                  fontWeight: 700,
+                  fontWeight: 500,
                   cursor: 'pointer',
                   padding: '4px 8px',
                 }}
@@ -3381,7 +3421,7 @@ const ExpandedCellView = ({
                   }}
                   style={moreItemStyle}
                 >
-                  Called Strike
+                  Called strike
                 </button>
                 <button
                   onClick={() => {
@@ -3391,7 +3431,7 @@ const ExpandedCellView = ({
                   }}
                   style={moreItemStyle}
                 >
-                  Swing & Miss
+                  Swing & miss
                 </button>
                 <button
                   onClick={() => {
@@ -3411,12 +3451,12 @@ const ExpandedCellView = ({
                   }}
                   style={moreItemStyle}
                 >
-                  Ball in Play
+                  Ball in play
                 </button>
 
                 {/* Divider — edge-case events below */}
                 <div style={{
-                  borderTop: '1px solid rgba(0,0,0,0.12)',
+                  borderTop: `1px solid ${T.rule}`,
                   margin: '4px 0',
                 }} />
 
@@ -3424,7 +3464,7 @@ const ExpandedCellView = ({
                   onClick={() => setMoreSubStage('bunt_resolve')}
                   style={moreItemStyle}
                 >
-                  Bunt Attempt
+                  Bunt attempt
                 </button>
                 <button
                   onClick={() => {
@@ -3459,7 +3499,7 @@ const ExpandedCellView = ({
                   }}
                   style={moreItemStyle}
                 >
-                  Hit By Pitch
+                  Hit by pitch
                 </button>
                 <button
                   onClick={() => {
@@ -3469,7 +3509,7 @@ const ExpandedCellView = ({
                   }}
                   style={moreItemStyle}
                 >
-                  Intentional Ball
+                  Intentional ball
                 </button>
                 <button
                   onClick={() => {
@@ -3479,7 +3519,7 @@ const ExpandedCellView = ({
                   }}
                   style={moreItemStyle}
                 >
-                  Intentional Walk
+                  Intentional walk
                 </button>
                 <button
                   onClick={() => {
@@ -3489,7 +3529,7 @@ const ExpandedCellView = ({
                   }}
                   style={moreItemStyle}
                 >
-                  Batter Out (Interference)
+                  Batter out (Interference)
                 </button>
                 <button
                   onClick={() => {
@@ -3503,7 +3543,7 @@ const ExpandedCellView = ({
                 </button>
 
                 {/* Divider — scorer settings */}
-                <div style={{ borderTop: '1px solid rgba(0,0,0,0.12)', margin: '4px 0' }} />
+                <div style={{ borderTop: `1px solid ${T.rule}`, margin: '4px 0' }} />
 
                 {/* Pitch Detail toggle. Lives here so it can be flipped mid-game —
                     a scorer may want type/velo for one pitcher and not the rest. */}
@@ -3511,23 +3551,22 @@ const ExpandedCellView = ({
                   onClick={() => onTogglePitchDetail && onTogglePitchDetail()}
                   style={{ ...moreItemStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
                 >
-                  <span>Pitch Detail (type + speed)</span>
+                  <span>Pitch detail (type + speed)</span>
                   <span style={{
-                    fontSize: '10px', fontWeight: 800, letterSpacing: '0.08em',
-                    padding: '3px 8px', borderRadius: '10px',
-                    background: pitchDetailOn ? '#d94425' : 'rgba(0,0,0,0.08)',
-                    color: pitchDetailOn ? '#fff' : '#7a7468',
-                  }}>{pitchDetailOn ? 'ON' : 'OFF'}</span>
+                    fontSize: '11px', fontWeight: 400, padding: '3px 8px', borderRadius: '10px',
+                    background: pitchDetailOn ? T.ink : T.rule,
+                    color: pitchDetailOn ? T.paperRaised : T.inkMuted,
+                  }}>{pitchDetailOn ? 'On' : 'Off'}</span>
                 </button>
 
                 {/* Divider — inning control (practice / pitch-count mode) */}
-                <div style={{ borderTop: '1px solid rgba(0,0,0,0.12)', margin: '4px 0' }} />
+                <div style={{ borderTop: `1px solid ${T.rule}`, margin: '4px 0' }} />
 
                 <button
                   onClick={() => setMoreSubStage('end_inning_reason')}
-                  style={{ ...moreItemStyle, color: '#d94425' }}
+                  style={{ ...moreItemStyle, color: T.ink }}
                 >
-                  End Half Inning
+                  End half inning
                 </button>
               </div>
             )}
@@ -3552,11 +3591,11 @@ const ExpandedCellView = ({
                   }}
                   style={moreItemStyle}
                 >
-                  Run Limit
+                  Run limit
                 </button>
                 <button
                   onClick={() => setMoreSubStage(null)}
-                  style={{ ...moreItemStyle, background: 'transparent', color: '#7a7468', border: '1px solid rgba(0,0,0,0.12)' }}
+                  style={{ ...moreItemStyle, background: 'transparent', color: T.inkMuted, border: `1px solid ${T.rule}` }}
                 >
                   ← Back
                 </button>
@@ -3599,7 +3638,7 @@ const ExpandedCellView = ({
                 </button>
                 <button
                   onClick={() => setMoreSubStage(null)}
-                  style={{ ...moreItemStyle, background: 'transparent', color: '#7a7468', border: '1px solid rgba(0,0,0,0.12)' }}
+                  style={{ ...moreItemStyle, background: 'transparent', color: T.inkMuted, border: `1px solid ${T.rule}` }}
                 >
                   ← Back
                 </button>
@@ -3610,53 +3649,63 @@ const ExpandedCellView = ({
       )}
 
       {/* Pitch row */}
-      <div style={{ fontSize: '9px', fontWeight: 700, color: '#d94425', letterSpacing: '0.18em', textTransform: 'uppercase', margin: '0 2px 6px' }}>
+      <div style={{ fontSize: '11px', fontWeight: 400, color: T.inkMuted, margin: '0 2px 6px' }}>
         Pitch
       </div>
+      {/* Ruled-paper geometry: a 2x2 divided by hairlines, then In play as the one
+          filled bar. Exactly one filled element is visible on this screen, and it is
+          the tap the scorer reaches for most. */}
       <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(5, 1fr)',
-        gap: '6px',
         marginBottom: '10px',
         opacity: armedRunner ? 0.4 : 1,
         pointerEvents: armedRunner ? 'none' : 'auto',
         transition: 'opacity 120ms ease',
       }}>
-        {pitchButtons.map(b => {
-          const flashing = localFlash === `pitch:${b.key}`;
-          return (
-            <button
-              key={b.key}
-              onClick={() => { flashLocally(`pitch:${b.key}`); handleCellPitchTap(b.key); }}
-              style={{
-                ...baseBtnStyle,
-                background: '#fff',
-                borderColor: 'rgba(0,0,0,0.18)',
-                ...(flashing ? flashStyle : {}),
-              }}
-            >
-              {b.label}
-            </button>
-          );
-        })}
-        {/* Ball in Play quick button — skips the PA Result top-level takeover and goes
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          borderTop: `1px solid ${T.rule}`,
+          borderLeft: `1px solid ${T.rule}`,
+        }}>
+          {pitchButtons.map(b => {
+            const flashing = localFlash === `pitch:${b.key}`;
+            return (
+              <button
+                key={b.key}
+                onClick={() => { flashLocally(`pitch:${b.key}`); handleCellPitchTap(b.key); }}
+                style={{
+                  ...baseBtnStyle,
+                  ...(flashing ? flashStyle : {}),
+                }}
+              >
+                {b.label}
+              </button>
+            );
+          })}
+        </div>
+        {/* Ball in play quick button — skips the PA Result top-level takeover and goes
             straight to the batted-ball-type screen. Lives on the pitch row because it's
             a one-tap shortcut for the most common cascade entry. */}
         <button
           onClick={onOpenBipQuick}
           style={{
             ...baseBtnStyle,
-            background: '#fff5ee',
-            borderColor: 'rgba(217, 68, 37, 0.5)',
-            color: '#d94425',
+            width: '100%',
+            border: 'none',
+            borderRadius: 0,
+            background: T.ink,
+            color: T.paper,
+            fontWeight: 600,
+            fontSize: '15px',
+            marginTop: '10px',
           }}
         >
-          Ball in<br />Play
+          In play
         </button>
       </div>
 
-      {/* PA Result and Runner Advance dropdowns removed — those cascades now fire only
-          from the action buttons (Ball in Play, pitch outcomes) and from tapping runners
+      {/* PA Result and Runner advance dropdowns removed — those cascades now fire only
+          from the action buttons (Ball in play, pitch outcomes) and from tapping runners
           on the diamond, which keeps the cell view focused on the field. */}
 
       {/* 2A+: Pitcher-number chip removed from CellView. Pitcher jersey entry now
@@ -3687,31 +3736,30 @@ const ExpandedCellView = ({
         );
         return (
           <div style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
+            position: 'fixed', inset: 0, background: T.scrim,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             zIndex: 60, padding: '24px',
           }}>
             <div style={{
-              background: '#fbf6ea', borderRadius: '12px', padding: '24px 22px 20px',
-              maxWidth: '340px', width: '100%', boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
-              border: '1px solid rgba(0,0,0,0.06)',
+              background: T.paperRaised, borderRadius: '12px', padding: '24px 22px 20px',
+              maxWidth: '340px', width: '100%', boxShadow: `0 8px 32px ${T.ruleStrong}`,
+              border: `1px solid ${T.rule}`,
             }}>
-              <div style={{ fontSize: '9px', letterSpacing: '0.22em', textTransform: 'uppercase', color: '#d94425', fontWeight: 700, marginBottom: '8px' }}>
-                Trailing Runner
+              <div style={{ fontSize: '11px', color: T.inkMuted, fontWeight: 400, marginBottom: '8px' }}>
+                Trailing runner
               </div>
-              <div style={{ fontSize: '16px', lineHeight: 1.4, color: '#1a1a1a', marginBottom: '6px', fontWeight: 600 }}>
+              <div style={{ fontSize: '16px', lineHeight: 1.4, color: T.ink, marginBottom: '6px', fontWeight: 400 }}>
                 Did the runner{trailingBases.length > 1 ? 's' : ''} on {list} advance {actionWord}?
               </div>
-              <div style={{ fontSize: '12px', lineHeight: 1.5, color: '#5a544a', marginBottom: '20px' }}>
+              <div style={{ fontSize: '12px', lineHeight: 1.5, color: T.inkSecondary, marginBottom: '20px' }}>
                 Yes slides {trailingBases.length > 1 ? 'them' : 'the runner'} up one base on the same play. No leaves {trailingBases.length > 1 ? 'them' : 'the runner'} put — you can still move {trailingBases.length > 1 ? 'them' : 'the runner'} manually.
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <button
                   onClick={() => finalizeIdleCommit(advanceTrailers(), category, pitch, paEndCategory)}
                   style={{
-                    background: '#d94425', color: '#fff', border: 'none', borderRadius: '8px',
-                    padding: '14px', fontFamily: 'inherit', fontSize: '14px', fontWeight: 800,
-                    letterSpacing: '0.05em', cursor: 'pointer',
+                    background: T.ink, color: T.paperRaised, border: 'none', borderRadius: '8px',
+                    padding: '14px', fontFamily: 'inherit', fontSize: '14px', fontWeight: 600, cursor: 'pointer',
                   }}
                 >
                   Yes — advanced
@@ -3719,9 +3767,9 @@ const ExpandedCellView = ({
                 <button
                   onClick={() => finalizeIdleCommit(runnerMovements, category, pitch, paEndCategory)}
                   style={{
-                    background: 'transparent', color: '#1a1a1a', border: '1px solid rgba(0,0,0,0.18)',
+                    background: 'transparent', color: T.ink, border: `1px solid ${T.ruleStrong}`,
                     borderRadius: '8px', padding: '14px', fontFamily: 'inherit', fontSize: '14px',
-                    fontWeight: 700, cursor: 'pointer',
+                    fontWeight: 400, cursor: 'pointer',
                   }}
                 >
                   No — held
@@ -3738,7 +3786,7 @@ const ExpandedCellView = ({
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.4)',
+            background: T.scrim,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -3749,21 +3797,19 @@ const ExpandedCellView = ({
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              background: '#fbf6ea',
+              background: T.paperRaised,
               borderRadius: '12px',
               padding: '24px 22px 20px',
               maxWidth: '340px',
               width: '100%',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
-              border: '1px solid rgba(0,0,0,0.06)',
+              boxShadow: `0 8px 32px ${T.ruleStrong}`,
+              border: `1px solid ${T.rule}`,
             }}
           >
             <div style={{
-              fontSize: '9px',
-              letterSpacing: '0.22em',
-              textTransform: 'uppercase',
-              color: '#d94425',
-              fontWeight: 700,
+              fontSize: '11px',
+              color: T.inkMuted,
+              fontWeight: 400,
               marginBottom: '8px',
             }}>
               Mark Leadoff
@@ -3771,9 +3817,9 @@ const ExpandedCellView = ({
             <div style={{
               fontSize: '16px',
               lineHeight: 1.4,
-              color: '#1a1a1a',
+              color: T.ink,
               marginBottom: '6px',
-              fontWeight: 600,
+              fontWeight: 400,
             }}>
               {lineupMarkerCount === 0
                 ? 'Mark this batter as leadoff?'
@@ -3784,7 +3830,7 @@ const ExpandedCellView = ({
             <div style={{
               fontSize: '12px',
               lineHeight: 1.5,
-              color: '#5a544a',
+              color: T.inkSecondary,
               marginBottom: '20px',
             }}>
               {lineupMarkerCount === 0
@@ -3799,12 +3845,12 @@ const ExpandedCellView = ({
                 style={{
                   flex: 1,
                   background: 'transparent',
-                  border: '1px solid rgba(0,0,0,0.15)',
+                  border: `1px solid ${T.ruleStrong}`,
                   borderRadius: '8px',
                   padding: '12px',
                   fontSize: '14px',
-                  fontWeight: 600,
-                  color: '#5a544a',
+                  fontWeight: 400,
+                  color: T.inkSecondary,
                   cursor: 'pointer',
                   fontFamily: 'inherit',
                 }}
@@ -3818,8 +3864,8 @@ const ExpandedCellView = ({
                 }}
                 style={{
                   flex: 1,
-                  background: '#d94425',
-                  color: '#fff',
+                  background: T.ink,
+                  color: T.paperRaised,
                   border: 'none',
                   borderRadius: '8px',
                   padding: '12px',
@@ -4941,7 +4987,7 @@ function LoopholeMatrixTagger() {
   //                          runner on 1B if present; otherwise default to
   //                          stay-put and let the scorer adjust).
   //
-  // Reached on Error / Fielder's Choice / Other — minimal defaults; batter on 1B,
+  // Reached on error / Fielder's choice / Other — minimal defaults; batter on 1B,
   //                          runners stay put. Scorer is expected to adjust.
   const defaultRunnerMovements = (prevStateKey, category, hitType) => {
     const movements = [];
@@ -5120,7 +5166,7 @@ function LoopholeMatrixTagger() {
     // ball was put in play). Walk → ball. Strikeout types → called or swing-miss.
     // Dropped third strike → swing-miss. Other → in_play (could be HBP etc; in_play is
     // a reasonable default since the PA ended on a real pitch the batter didn't take).
-    // Intentional Walk → null (no pitch logged at all — IBB is a no-pitch event in
+    // Intentional walk → null (no pitch logged at all — IBB is a no-pitch event in
     // youth baseball where the batter is awarded 1B without anything thrown).
     let closingPitch;
     if (category === 'intentional_walk' || category === 'batter_out') closingPitch = null;
@@ -5764,14 +5810,14 @@ function LoopholeMatrixTagger() {
     })();
 
     const summaryText = [
-      'WILDCARD FINGERPRINT',
+      'WildCard fingerprint',
       '====================',
       gameMeta ? `${gameMeta.awayTeam} ${lineScore.away} — ${lineScore.home} ${gameMeta.homeTeam}` : '',
-      gameMeta ? `${gameMeta.sport} · ${gameMeta.ageDivision} · ${gameMeta.format} · ${gameMeta.host}` : '',
+      gameMeta ? `${gameMeta.sport}   ${gameMeta.ageDivision}   ${gameMeta.format}   ${gameMeta.host}` : '',
       gameMeta ? `Date: ${dateStr}` : '',
       '',
-      `Pitches: ${pitchEvents.length} (${awayBattingCount} ${gameMeta?.awayTeam || 'away'} batting · ${homeBattingCount} ${gameMeta?.homeTeam || 'home'} batting)`,
-      `Plate appearances: ${paEndCount}  ·  Between-pitch events: ${betweenPitchCount}`,
+      `Pitches: ${pitchEvents.length} (${awayBattingCount} ${gameMeta?.awayTeam || 'away'} batting   ${homeBattingCount} ${gameMeta?.homeTeam || 'home'} batting)`,
+      `Plate appearances: ${paEndCount}   Between-pitch events: ${betweenPitchCount}`,
       '',
       'Line score:',
       lineScore.lines || '  (no innings tagged)',
@@ -5919,9 +5965,9 @@ function LoopholeMatrixTagger() {
     ctx.translate(cx, cy);
     ctx.rotate(Math.PI / 4);
     ctx.lineWidth = 1.5;
-    ctx.strokeStyle = '#e8943a';
+    ctx.strokeStyle = T.ink;
     if (filled) {
-      ctx.fillStyle = '#e8943a';
+      ctx.fillStyle = T.ink;
       ctx.fillRect(-size / 2, -size / 2, size, size);
     } else {
       ctx.strokeRect(-size / 2, -size / 2, size, size);
@@ -5947,39 +5993,39 @@ function LoopholeMatrixTagger() {
         }));
         return (
           <div style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
+            position: 'fixed', inset: 0, background: T.scrim,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             zIndex: 85, padding: '20px',
           }}>
             <div style={{
-              background: '#fdfaf2', borderRadius: '12px', padding: '20px',
+              background: T.paperRaised, borderRadius: '12px', padding: '20px',
               maxWidth: '360px', width: '100%', maxHeight: '80vh', overflowY: 'auto',
-              boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
+              boxShadow: `0 10px 30px ${T.scrim}`,
             }}>
               <div style={{
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px',
               }}>
-                <div style={{ fontSize: '11px', fontWeight: 800, letterSpacing: '0.18em', color: '#d94425', textTransform: 'uppercase' }}>
+                <div style={{ fontSize: '11px', fontWeight: 400, color: T.inkMuted }}>
                   {teamName} Lineup
                 </div>
                 <button
                   onClick={() => setRosterEditor(null)}
-                  style={{ background: 'transparent', border: 'none', color: '#7a7468', fontSize: '18px', cursor: 'pointer', padding: '0 4px' }}
+                  style={{ background: 'transparent', border: 'none', color: T.inkMuted, fontSize: '18px', cursor: 'pointer', padding: '0 4px' }}
                 >✕</button>
               </div>
-              <div style={{ fontSize: '11px', color: '#7a7468', lineHeight: 1.4, marginBottom: '14px' }}>
+              <div style={{ fontSize: '11px', color: T.inkMuted, lineHeight: 1.4, marginBottom: '14px' }}>
                 Numbers go in the data; names stay on this device only. Order = batting order.
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px' }}>
                 {rows.length === 0 && (
-                  <div style={{ fontSize: '12px', color: '#a8a294', fontStyle: 'italic', padding: '8px 0' }}>
+                  <div style={{ fontSize: '12px', color: T.inkFaint, fontStyle: 'italic', padding: '8px 0' }}>
                     No players yet — add the batting order below.
                   </div>
                 )}
                 {rows.map((row, idx) => (
                   <div key={idx} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                    <span style={{ fontSize: '11px', color: '#a8a294', width: '16px', textAlign: 'right' }}>{idx + 1}</span>
+                    <span style={{ fontSize: '11px', color: T.inkFaint, width: '16px', textAlign: 'right' }}>{idx + 1}</span>
                     <input
                       value={row.num || ''}
                       onChange={(e) => setRows(rs => rs.map((r, i) => i === idx ? { ...r, num: e.target.value.replace(/[^0-9]/g, '').slice(0, 3) } : r))}
@@ -5987,8 +6033,8 @@ function LoopholeMatrixTagger() {
                       inputMode="numeric"
                       style={{
                         width: '46px', boxSizing: 'border-box', padding: '8px', fontSize: '13px',
-                        border: '1px solid rgba(0,0,0,0.15)', borderRadius: '6px', fontFamily: 'inherit',
-                        textAlign: 'center', background: '#fff',
+                        border: `1px solid ${T.ruleStrong}`, borderRadius: '6px', fontFamily: 'inherit',
+                        textAlign: 'center', background: T.paperRaised,
                       }}
                     />
                     <input
@@ -5997,13 +6043,13 @@ function LoopholeMatrixTagger() {
                       placeholder="Name"
                       style={{
                         flex: 1, boxSizing: 'border-box', padding: '8px', fontSize: '13px',
-                        border: '1px solid rgba(0,0,0,0.15)', borderRadius: '6px', fontFamily: 'inherit',
-                        background: '#fff',
+                        border: `1px solid ${T.ruleStrong}`, borderRadius: '6px', fontFamily: 'inherit',
+                        background: T.paperRaised,
                       }}
                     />
                     <button
                       onClick={() => setRows(rs => rs.filter((_, i) => i !== idx))}
-                      style={{ background: 'transparent', border: 'none', color: '#c0392b', fontSize: '16px', cursor: 'pointer', padding: '0 4px' }}
+                      style={{ background: 'transparent', border: 'none', color: T.inkMuted, fontSize: '16px', cursor: 'pointer', padding: '0 4px' }}
                     >✕</button>
                   </div>
                 ))}
@@ -6012,8 +6058,8 @@ function LoopholeMatrixTagger() {
               <button
                 onClick={() => setRows(rs => [...rs, { num: '', name: '' }])}
                 style={{
-                  width: '100%', padding: '10px', background: 'transparent', border: '1px dashed rgba(0,0,0,0.25)',
-                  borderRadius: '8px', color: '#5a544a', fontFamily: 'inherit', fontSize: '13px', fontWeight: 600,
+                  width: '100%', padding: '10px', background: 'transparent', border: `1px dashed ${T.ruleStrong}`,
+                  borderRadius: '8px', color: T.inkSecondary, fontFamily: 'inherit', fontSize: '13px', fontWeight: 500,
                   cursor: 'pointer', marginBottom: '12px',
                 }}
               >+ Add Player</button>
@@ -6021,14 +6067,13 @@ function LoopholeMatrixTagger() {
               {/* Pitchers — tracked separately from the batting order. Numbers feed
                   the data; names surface on the top pitcher panel as F. Lastname. */}
               <div style={{
-                fontSize: '10px', fontWeight: 800, letterSpacing: '0.14em', color: '#7a7468',
-                textTransform: 'uppercase', margin: '4px 0 8px', borderTop: '1px solid rgba(0,0,0,0.08)', paddingTop: '14px',
+                fontSize: '11px', fontWeight: 400, color: T.inkMuted, margin: '4px 0 8px', borderTop: `1px solid ${T.rule}`, paddingTop: '14px',
               }}>
                 Pitchers
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px' }}>
                 {pRows.length === 0 && (
-                  <div style={{ fontSize: '12px', color: '#a8a294', fontStyle: 'italic', padding: '4px 0' }}>
+                  <div style={{ fontSize: '12px', color: T.inkFaint, fontStyle: 'italic', padding: '4px 0' }}>
                     No pitchers yet — add their numbers and names.
                   </div>
                 )}
@@ -6041,8 +6086,8 @@ function LoopholeMatrixTagger() {
                       inputMode="numeric"
                       style={{
                         width: '46px', boxSizing: 'border-box', padding: '8px', fontSize: '13px',
-                        border: '1px solid rgba(0,0,0,0.15)', borderRadius: '6px', fontFamily: 'inherit',
-                        textAlign: 'center', background: '#fff',
+                        border: `1px solid ${T.ruleStrong}`, borderRadius: '6px', fontFamily: 'inherit',
+                        textAlign: 'center', background: T.paperRaised,
                       }}
                     />
                     <input
@@ -6051,13 +6096,13 @@ function LoopholeMatrixTagger() {
                       placeholder="Name"
                       style={{
                         flex: 1, boxSizing: 'border-box', padding: '8px', fontSize: '13px',
-                        border: '1px solid rgba(0,0,0,0.15)', borderRadius: '6px', fontFamily: 'inherit',
-                        background: '#fff',
+                        border: `1px solid ${T.ruleStrong}`, borderRadius: '6px', fontFamily: 'inherit',
+                        background: T.paperRaised,
                       }}
                     />
                     <button
                       onClick={() => setPRows(rs => rs.filter((_, i) => i !== idx))}
-                      style={{ background: 'transparent', border: 'none', color: '#c0392b', fontSize: '16px', cursor: 'pointer', padding: '0 4px' }}
+                      style={{ background: 'transparent', border: 'none', color: T.inkMuted, fontSize: '16px', cursor: 'pointer', padding: '0 4px' }}
                     >✕</button>
                   </div>
                 ))}
@@ -6066,8 +6111,8 @@ function LoopholeMatrixTagger() {
               <button
                 onClick={() => setPRows(rs => [...rs, { num: '', name: '' }])}
                 style={{
-                  width: '100%', padding: '10px', background: 'transparent', border: '1px dashed rgba(0,0,0,0.25)',
-                  borderRadius: '8px', color: '#5a544a', fontFamily: 'inherit', fontSize: '13px', fontWeight: 600,
+                  width: '100%', padding: '10px', background: 'transparent', border: `1px dashed ${T.ruleStrong}`,
+                  borderRadius: '8px', color: T.inkSecondary, fontFamily: 'inherit', fontSize: '13px', fontWeight: 500,
                   cursor: 'pointer', marginBottom: '12px',
                 }}
               >+ Add Pitcher</button>
@@ -6091,9 +6136,8 @@ function LoopholeMatrixTagger() {
                   setRosterEditor(null);
                 }}
                 style={{
-                  width: '100%', padding: '14px', background: '#d94425', color: '#fff', border: 'none',
-                  borderRadius: '8px', fontFamily: 'inherit', fontSize: '14px', fontWeight: 800,
-                  letterSpacing: '0.05em', cursor: 'pointer',
+                  width: '100%', padding: '14px', background: T.ink, color: T.paperRaised, border: 'none',
+                  borderRadius: '8px', fontFamily: 'inherit', fontSize: '14px', fontWeight: 600, cursor: 'pointer',
                 }}
               >Done</button>
               {(rows.length > 0 || pRows.length > 0) && (
@@ -6101,8 +6145,8 @@ function LoopholeMatrixTagger() {
                   onClick={() => { setRows([]); setPRows([]); }}
                   style={{
                     width: '100%', marginTop: '8px', padding: '10px', background: 'transparent',
-                    border: 'none', color: '#a8a294', fontFamily: 'inherit', fontSize: '12px',
-                    fontWeight: 600, cursor: 'pointer', textDecoration: 'underline',
+                    border: 'none', color: T.inkFaint, fontFamily: 'inherit', fontSize: '12px',
+                    fontWeight: 500, cursor: 'pointer', textDecoration: 'underline',
                   }}
                 >Clear all</button>
               )}
@@ -6115,11 +6159,11 @@ function LoopholeMatrixTagger() {
   if (isLoaded && !gameMeta) {
     const fieldStyle = {
       width: '100%',
-      background: '#fdfaf2',
-      border: '1px solid rgba(0,0,0,0.22)',
+      background: T.paperRaised,
+      border: `1px solid ${T.ruleStrong}`,
       borderRadius: '3px',
       padding: '14px 12px',
-      color: '#1a1a1a',
+      color: T.ink,
       fontFamily: 'inherit',
       fontSize: '14px',
       outline: 'none',
@@ -6127,22 +6171,19 @@ function LoopholeMatrixTagger() {
     };
     const labelStyle = {
       display: 'block',
-      fontSize: '9px',
-      color: '#7a7468',
-      letterSpacing: '0.2em',
-      textTransform: 'uppercase',
+      fontSize: '11px',
+      color: T.inkMuted,
       marginBottom: '6px',
-      fontWeight: 600,
+      fontWeight: 400,
     };
     const segmentStyle = (active) => ({
       flex: 1,
-      background: active ? '#d94425' : '#fdfaf2',
-      border: `1px solid ${active ? '#d94425' : 'rgba(0,0,0,0.25)'}`,
-      color: active ? '#ffffff' : '#5a544a',
+      background: active ? T.inkMuted : T.paperRaised,
+      border: `1px solid ${active ? T.inkMuted : T.ruleStrong}`,
+      color: active ? T.paperRaised : T.inkSecondary,
       padding: '12px 8px',
       fontSize: '11px',
-      letterSpacing: '0.1em',
-      fontWeight: 600,
+      fontWeight: 400,
       cursor: 'pointer',
       fontFamily: 'inherit',
       borderRadius: '3px',
@@ -6154,40 +6195,37 @@ function LoopholeMatrixTagger() {
     return (
       <div style={{
         minHeight: '100vh',
-        background: '#f5f1e8',
+        background: T.paper,
         backgroundImage: `
-          linear-gradient(rgba(0,0,0,0.025) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(0,0,0,0.025) 1px, transparent 1px)
+          linear-gradient(${T.rule} 1px, transparent 1px),
+          linear-gradient(90deg, ${T.rule} 1px, transparent 1px)
         `,
         backgroundSize: '32px 32px',
-        fontFamily: '"JetBrains Mono", "SF Mono", Menlo, monospace',
-        color: '#1a1a1a',
+        fontFamily: 'inherit',
+        color: T.ink,
         padding: '24px 16px 40px',
       }}>
         <div style={{ maxWidth: '420px', margin: '0 auto' }}>
           <div style={{ marginBottom: '24px' }}>
             <div style={{
               fontSize: '22px',
-              fontWeight: 800,
-              letterSpacing: '0.08em',
+              fontWeight: 400,
               lineHeight: 1,
             }}>
-              WILD<span style={{ color: '#d94425' }}>CARD</span>
+              WILD<span style={{ color: T.ink }}>CARD</span>
             </div>
             <div style={{
-              fontSize: '9px',
-              color: '#7a7468',
-              letterSpacing: '0.2em',
+              fontSize: '11px',
+              color: T.inkMuted,
               marginTop: '4px',
-              textTransform: 'uppercase',
             }}>
-              New Fingerprint · Setup
+              New fingerprint
             </div>
           </div>
 
           <div style={{
-            background: '#fdfaf2',
-            border: '1px solid rgba(0,0,0,0.08)',
+            background: T.paperRaised,
+            border: `1px solid ${T.rule}`,
             borderRadius: '6px',
             padding: '20px',
           }}>
@@ -6259,7 +6297,7 @@ function LoopholeMatrixTagger() {
                   backgroundSize: '12px',
                   paddingRight: '32px',
                   cursor: 'pointer',
-                  color: setupForm.ageDivision ? '#1a1a1a' : '#a8a294',
+                  color: setupForm.ageDivision ? T.ink : T.inkFaint,
                 }}
               >
                 <option value="" disabled>Select age division</option>
@@ -6281,7 +6319,7 @@ function LoopholeMatrixTagger() {
             </div>
 
             <div style={{ marginBottom: '20px' }}>
-              <label style={labelStyle}>Lineups <span style={{ textTransform: 'none', letterSpacing: 0, color: '#a8a294' }}>(optional)</span></label>
+              <label style={labelStyle}>Lineups <span style={{ textTransform: 'none', color: T.inkFaint }}>(optional)</span></label>
               <div style={{ display: 'flex', gap: '8px' }}>
                 {['away', 'home'].map(team => {
                   const tn = (team === 'home' ? setupForm.homeTeam : setupForm.awayTeam).trim();
@@ -6291,17 +6329,17 @@ function LoopholeMatrixTagger() {
                       key={team}
                       onClick={() => setRosterEditor({ team })}
                       style={{
-                        flex: 1, padding: '12px 10px', background: '#fbf6ea',
-                        border: '1px solid rgba(0,0,0,0.15)', borderRadius: '6px',
-                        color: '#1a1a1a', fontFamily: 'inherit', fontSize: '12px', fontWeight: 600,
+                        flex: 1, padding: '12px 10px', background: T.paperRaised,
+                        border: `1px solid ${T.ruleStrong}`, borderRadius: '6px',
+                        color: T.ink, fontFamily: 'inherit', fontSize: '12px', fontWeight: 500,
                         cursor: 'pointer', textAlign: 'left', lineHeight: 1.3,
                       }}
                     >
-                      <div style={{ fontSize: '9px', letterSpacing: '0.1em', color: '#a8a294', textTransform: 'uppercase' }}>
+                      <div style={{ fontSize: '11px', color: T.inkFaint }}>
                         {team === 'home' ? 'Home' : 'Away'}
                       </div>
                       <div style={{ marginTop: '2px' }}>{tn || (team === 'home' ? 'Home' : 'Away')}</div>
-                      <div style={{ fontSize: '10px', color: count ? '#2e7d32' : '#a8a294', marginTop: '2px' }}>
+                      <div style={{ fontSize: '11px', color: count ? T.ink : T.inkFaint, marginTop: '2px' }}>
                         {count ? `${count} player${count === 1 ? '' : 's'}` : 'Add players'}
                       </div>
                     </button>
@@ -6315,27 +6353,24 @@ function LoopholeMatrixTagger() {
               disabled={!isSetupValid}
               style={{
                 width: '100%',
-                background: isSetupValid ? '#d94425' : '#ebe6d8',
+                background: isSetupValid ? T.ink : T.rule,
                 border: 'none',
-                color: isSetupValid ? '#ffffff' : '#a8a294',
+                color: isSetupValid ? T.paperRaised : T.inkFaint,
                 padding: '16px',
                 borderRadius: '3px',
                 fontSize: '12px',
-                letterSpacing: '0.2em',
-                textTransform: 'uppercase',
-                fontWeight: 700,
+                fontWeight: 500,
                 cursor: isSetupValid ? 'pointer' : 'not-allowed',
                 fontFamily: 'inherit',
               }}
             >
-              Start Tagging →
+              Start tagging
             </button>
 
             <div style={{
               marginTop: '14px',
-              fontSize: '9px',
-              color: '#a8a294',
-              letterSpacing: '0.1em',
+              fontSize: '11px',
+              color: T.inkFaint,
               lineHeight: 1.6,
               textAlign: 'center',
             }}>
@@ -6347,10 +6382,8 @@ function LoopholeMatrixTagger() {
           <div style={{
             marginTop: '24px',
             textAlign: 'center',
-            fontSize: '8px',
-            color: '#a8a294',
-            letterSpacing: '0.25em',
-            textTransform: 'uppercase',
+            fontSize: '11px',
+            color: T.inkFaint,
           }}>
             Powered by Loophohl
           </div>
@@ -6363,14 +6396,14 @@ function LoopholeMatrixTagger() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: '#f5f1e8',
+      background: T.paper,
       backgroundImage: `
-        linear-gradient(rgba(0,0,0,0.025) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(0,0,0,0.025) 1px, transparent 1px)
+        linear-gradient(${T.rule} 1px, transparent 1px),
+        linear-gradient(90deg, ${T.rule} 1px, transparent 1px)
       `,
       backgroundSize: '32px 32px',
-      fontFamily: '"JetBrains Mono", "SF Mono", Menlo, monospace',
-      color: '#1a1a1a',
+      fontFamily: 'inherit',
+      color: T.ink,
       padding: '24px 16px',
       userSelect: 'none',
       WebkitTapHighlightColor: 'transparent',
@@ -6391,25 +6424,23 @@ function LoopholeMatrixTagger() {
             alt=""
             style={{ width: '24px', height: '24px', display: 'block' }}
           />
-          <span style={{ fontSize: '15px', fontWeight: 800, letterSpacing: '0.04em', lineHeight: 1 }}>
-            WILD<span style={{ color: '#d94425' }}>CARD</span>
+          <span style={{ fontSize: '15px', fontWeight: 400, lineHeight: 1 }}>
+            WILD<span style={{ color: T.ink }}>CARD</span>
           </span>
         </div>
         <span style={{
           display: 'inline-flex',
           alignItems: 'center',
           gap: '4px',
-          fontSize: '8px',
-          letterSpacing: '0.15em',
-          textTransform: 'uppercase',
-          color: storageMode === 'memory-only' ? '#d94425' : '#6b9a26',
+          fontSize: '11px',
+          color: storageMode === 'memory-only' ? T.paper : T.ink,
         }}>
           <span style={{
             display: 'inline-block',
             width: '5px',
             height: '5px',
             borderRadius: '50%',
-            background: storageMode === 'memory-only' ? '#d94425' : '#6b9a26',
+            background: storageMode === 'memory-only' ? T.ink : 'transparent',
           }} />
           {storageMode === 'local-storage' && 'Saved'}
           {storageMode === 'memory-only' && 'Not saving'}
@@ -6466,7 +6497,7 @@ function LoopholeMatrixTagger() {
         };
         const pitcherLine = (num, jersey, cur, total, name) => {
           const id = (name && jersey) ? `${name} #${jersey}` : (jersey ? `#${jersey}` : (name || ''));
-          return `${id}${id ? ' · ' : ''}${cur}p`;
+          return `${id}${id ? '  ' : ''}${cur}p`;
         };
 
         // Renders the pitcher line as a tappable label that becomes an inline input
@@ -6501,12 +6532,12 @@ function LoopholeMatrixTagger() {
                 placeholder="jersey #"
                 style={{
                   width: '64px',
-                  fontSize: '9px',
+                  fontSize: '11px',
                   padding: '2px 4px',
-                  border: '1px solid #d94425',
+                  border: `1px solid ${T.rule}`,
                   borderRadius: '4px',
-                  background: '#fff',
-                  color: '#1a1a1a',
+                  background: T.paperRaised,
+                  color: T.ink,
                   textAlign: align === 'right' ? 'right' : 'left',
                   outline: 'none',
                   marginTop: '1px',
@@ -6534,13 +6565,13 @@ function LoopholeMatrixTagger() {
             const entry = slot ? (rosters[side] || [])[slot - 1] : null;
             const name = entry ? formatInitialLast(entry.name) : '';
             let text;
-            if (name && hitterNum) text = `${name} · #${hitterNum}`;
+            if (name && hitterNum) text = `${name}  #${hitterNum}`;
             else if (name) text = name;
             else if (hitterNum) text = `#${hitterNum}`;
             else text = 'At bat';
             const hl = getHitterLine(side, hitterNum);
             if (hl && hl.atBats > 0) text += ` (${hl.hits}-${hl.atBats})`;
-            return <div style={{ ...pitcherSubStyle, color: '#d94425', fontWeight: 700 }}>{text}</div>;
+            return <div style={{ ...pitcherSubStyle, color: T.ink, fontWeight: 400 }}>{text}</div>;
           }
           return renderPitcherLine(side, num, jersey, cur, total, align);
         };
@@ -6554,41 +6585,40 @@ function LoopholeMatrixTagger() {
           minWidth: 0,
         };
         const teamNameStyle = {
-          fontSize: '9px',
-          fontWeight: 700,
-          color: '#7a7468',
-          letterSpacing: '0.08em',
+          fontSize: '11px',
+          fontWeight: 400,
+          color: T.inkMuted,
           whiteSpace: 'nowrap',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
         };
         const pitcherSubStyle = {
-          fontSize: '8px',
-          color: '#7a7468',
+          fontSize: '11px',
+          color: T.inkMuted,
           marginTop: '2px',
           whiteSpace: 'nowrap',
         };
         const scoreNumStyle = {
-          fontSize: '24px',
-          fontWeight: 800,
-          fontFamily: 'monospace',
-          color: '#1a1a1a',
+          fontSize: '32px',
+          fontWeight: 300,
+          fontFamily: 'inherit',
+          color: T.ink,
           lineHeight: 1,
+          fontVariantNumeric: 'tabular-nums',
         };
 
         return (
           <div style={{
             maxWidth: '560px',
             margin: '0 auto 4px',
-            background: '#fdfaf2',
-            border: '1px solid rgba(0,0,0,0.08)',
-            borderRadius: '8px',
-            overflow: 'hidden',
+            background: 'transparent',
+            borderTop: `1px solid ${T.rule}`,
+            borderBottom: `1px solid ${T.rule}`,
           }}>
             <div style={{ display: 'flex', alignItems: 'stretch' }}>
               {/* Away team — display only (pitcher # is edited via the mound sphere) */}
               <div
-                style={{ ...teamCellStyle, borderRight: '1px solid rgba(0,0,0,0.08)' }}
+                style={{ ...teamCellStyle, borderRight: `1px solid ${T.rule}` }}
               >
                 <div style={{ minWidth: 0 }}>
                   <div style={teamNameStyle}>{gameMeta.awayTeam}</div>
@@ -6604,27 +6634,28 @@ function LoopholeMatrixTagger() {
                 alignItems: 'center',
                 justifyContent: 'center',
                 padding: '4px 10px',
-                background: '#f4efe1',
+                background: 'transparent',
+                borderRight: `1px solid ${T.rule}`,
                 minWidth: '96px',
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <span style={{ fontSize: '11px', fontWeight: 800, color: '#d94425', lineHeight: 1 }}>{half === 'Top' ? '▲' : '▼'}</span>
-                  <span style={{ fontSize: '13px', fontWeight: 800, color: '#1a1a1a', whiteSpace: 'nowrap' }}>{ordinalInning(inningNumber)}</span>
+                  <span style={{ fontSize: '11px', fontWeight: 500, color: T.ink, lineHeight: 1 }}>{half === 'Top' ? '▲' : '▼'}</span>
+                  <span style={{ fontSize: '13px', fontWeight: 400, color: T.ink, whiteSpace: 'nowrap' }}>{ordinalInning(inningNumber)}</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '2px', marginTop: '3px', fontVariantNumeric: 'tabular-nums' }}>
-                  <span style={{ fontSize: '8px', fontWeight: 700, color: '#d94425' }}>B</span>
-                  <span style={{ fontSize: '14px', fontWeight: 800, color: '#1a1a1a' }}>{count.balls}</span>
-                  <span style={{ fontSize: '9px', color: 'rgba(0,0,0,0.25)' }}>·</span>
-                  <span style={{ fontSize: '8px', fontWeight: 700, color: '#d94425' }}>S</span>
-                  <span style={{ fontSize: '14px', fontWeight: 800, color: '#1a1a1a' }}>{count.strikes}</span>
-                  <span style={{ fontSize: '9px', color: 'rgba(0,0,0,0.25)' }}>·</span>
-                  <span style={{ fontSize: '8px', fontWeight: 700, color: '#d94425' }}>O</span>
-                  <span style={{ fontSize: '14px', fontWeight: 800, color: '#1a1a1a' }}>{outs}</span>
+                  <span style={{ fontSize: '11px', fontWeight: 400, color: T.inkMuted }}>B</span>
+                  <span style={{ fontSize: '14px', fontWeight: 400, color: T.ink }}>{count.balls}</span>
+                  <span style={{ width: '10px', display: 'inline-block' }} />
+                  <span style={{ fontSize: '11px', fontWeight: 400, color: T.inkMuted }}>S</span>
+                  <span style={{ fontSize: '14px', fontWeight: 400, color: T.ink }}>{count.strikes}</span>
+                  <span style={{ width: '10px', display: 'inline-block' }} />
+                  <span style={{ fontSize: '11px', fontWeight: 400, color: T.inkMuted }}>O</span>
+                  <span style={{ fontSize: '14px', fontWeight: 400, color: T.ink }}>{outs}</span>
                 </div>
               </div>
               {/* Home team — display only (pitcher # is edited via the mound sphere) */}
               <div
-                style={{ ...teamCellStyle, borderLeft: '1px solid rgba(0,0,0,0.08)' }}
+                style={{ ...teamCellStyle, borderLeft: `1px solid ${T.rule}` }}
               >
                 <span style={scoreNumStyle}>{scores.home}</span>
                 <div style={{ minWidth: 0, textAlign: 'right' }}>
@@ -6646,8 +6677,8 @@ function LoopholeMatrixTagger() {
       {/* Game surface — always shows ExpandedCellView (diamond + actions) */}
       <div
         style={{
-          background: '#fdfaf2',
-          border: '1px solid rgba(0,0,0,0.08)',
+          background: T.paperRaised,
+          border: `1px solid ${T.rule}`,
           borderRadius: '6px',
           padding: '16px 12px 12px',
           maxWidth: '560px',
@@ -6711,20 +6742,20 @@ function LoopholeMatrixTagger() {
           if (!num) return null;
           const s = String(num);
           if (isBatting) {
-            if (currentBatterNum && String(currentBatterNum) === s) return { label: 'AT BAT', color: '#d94425' };
+            if (currentBatterNum && String(currentBatterNum) === s) return { label: 'At bat', color: T.ink };
             for (const b of ['3B', '2B', '1B']) {
-              if (baseJerseys[b] && String(baseJerseys[b]) === s) return { label: 'ON ' + b, color: '#2e7d32' };
+              if (baseJerseys[b] && String(baseJerseys[b]) === s) return { label: 'On ' + b, color: T.ink };
             }
           } else if (pitcherNum && String(pitcherNum) === s) {
-            return { label: 'PITCHING', color: '#3a6ea5' };
+            return { label: 'Pitching', color: T.ink };
           }
           return null;
         };
         return (
           <div style={{
             maxWidth: '560px', margin: '12px auto 0',
-            border: '1px solid rgba(0,0,0,0.08)', borderRadius: '6px',
-            background: '#fdfaf2', overflow: 'hidden',
+            border: `1px solid ${T.rule}`, borderRadius: '6px',
+            background: T.paperRaised, overflow: 'hidden',
           }}>
             {/* Header bar — tap to expand/collapse */}
             <div
@@ -6734,11 +6765,11 @@ function LoopholeMatrixTagger() {
                 padding: '11px 14px', cursor: 'pointer',
               }}
             >
-              <div style={{ fontSize: '10px', letterSpacing: '0.18em', textTransform: 'uppercase', color: '#7a7468', fontWeight: 700 }}>
-                {lineupPanelOpen ? '▾' : '▸'} Lineup · {teamName}
-                {isBatting && <span style={{ color: '#d94425' }}> · at bat</span>}
+              <div style={{ fontSize: '11px', color: T.inkMuted, fontWeight: 400 }}>
+                {lineupPanelOpen ? '▾' : '▸'} Lineup — {teamName}
+                {isBatting && <span style={{ color: T.inkMuted }}>  at bat</span>}
               </div>
-              <div style={{ fontSize: '9px', color: '#a8a294' }}>
+              <div style={{ fontSize: '11px', color: T.inkFaint }}>
                 {roster.length ? `${roster.length}` : 'tap to add'}
               </div>
             </div>
@@ -6750,35 +6781,32 @@ function LoopholeMatrixTagger() {
                   <button
                     onClick={() => setLineupTeamView('away')}
                     style={{
-                      flex: 1, padding: '7px', fontSize: '10px', fontWeight: 700, letterSpacing: '0.05em',
-                      borderRadius: '5px', cursor: 'pointer', fontFamily: 'inherit',
-                      border: '1px solid rgba(0,0,0,0.12)',
-                      background: team === 'away' ? '#1a1a2e' : 'transparent',
-                      color: team === 'away' ? '#fff' : '#5a544a',
+                      flex: 1, padding: '7px', fontSize: '11px', fontWeight: 400, borderRadius: '5px', cursor: 'pointer', fontFamily: 'inherit',
+                      border: `1px solid ${T.rule}`,
+                      background: team === 'away' ? T.ink : 'transparent',
+                      color: team === 'away' ? T.paperRaised : T.inkSecondary,
                     }}
                   >{(gameMeta.awayTeam || 'Away')}</button>
                   <button
                     onClick={() => setLineupTeamView('home')}
                     style={{
-                      flex: 1, padding: '7px', fontSize: '10px', fontWeight: 700, letterSpacing: '0.05em',
-                      borderRadius: '5px', cursor: 'pointer', fontFamily: 'inherit',
-                      border: '1px solid rgba(0,0,0,0.12)',
-                      background: team === 'home' ? '#1a1a2e' : 'transparent',
-                      color: team === 'home' ? '#fff' : '#5a544a',
+                      flex: 1, padding: '7px', fontSize: '11px', fontWeight: 400, borderRadius: '5px', cursor: 'pointer', fontFamily: 'inherit',
+                      border: `1px solid ${T.rule}`,
+                      background: team === 'home' ? T.ink : 'transparent',
+                      color: team === 'home' ? T.paperRaised : T.inkSecondary,
                     }}
                   >{(gameMeta.homeTeam || 'Home')}</button>
                   <button
                     onClick={() => setRosterEditor({ team })}
                     style={{
-                      padding: '7px 12px', fontSize: '10px', fontWeight: 700, letterSpacing: '0.05em',
-                      borderRadius: '5px', cursor: 'pointer', fontFamily: 'inherit',
-                      border: '1px solid #d94425', background: 'transparent', color: '#d94425',
+                      padding: '7px 12px', fontSize: '11px', fontWeight: 400, borderRadius: '5px', cursor: 'pointer', fontFamily: 'inherit',
+                      border: `1px solid ${T.rule}`, background: 'transparent', color: T.ink,
                     }}
                   >Edit</button>
                 </div>
 
                 {roster.length === 0 ? (
-                  <div style={{ fontSize: '12px', color: '#a8a294', fontStyle: 'italic', padding: '6px 0' }}>
+                  <div style={{ fontSize: '12px', color: T.inkFaint, fontStyle: 'italic', padding: '6px 0' }}>
                     No lineup for {teamName} yet — tap Edit to add numbers and names.
                   </div>
                 ) : (
@@ -6789,27 +6817,26 @@ function LoopholeMatrixTagger() {
                         <div key={idx} style={{
                           display: 'flex', alignItems: 'center', gap: '10px',
                           padding: '7px 4px',
-                          borderBottom: idx < roster.length - 1 ? '1px solid rgba(0,0,0,0.05)' : 'none',
-                          background: st ? 'rgba(216,68,37,0.04)' : 'transparent',
+                          borderBottom: idx < roster.length - 1 ? `1px solid ${T.rule}` : 'none',
+                          background: st ? T.rule : 'transparent',
                         }}>
-                          <span style={{ fontSize: '10px', color: '#a8a294', width: '14px', textAlign: 'right' }}>{idx + 1}</span>
+                          <span style={{ fontSize: '11px', color: T.inkFaint, width: '14px', textAlign: 'right' }}>{idx + 1}</span>
                           <span style={{
-                            fontSize: '12px', fontWeight: 700, color: '#1a1a1a',
-                            minWidth: '34px', fontFamily: 'monospace',
+                            fontSize: '12px', fontWeight: 400, color: T.ink,
+                            minWidth: '34px', fontFamily: 'inherit',
                           }}>{r.num ? `#${r.num}` : '—'}</span>
-                          <span style={{ flex: 1, fontSize: '13px', color: '#1a1a1a' }}>
-                            {r.name || <span style={{ color: '#c8c4b8' }}>—</span>}
+                          <span style={{ flex: 1, fontSize: '13px', color: T.ink }}>
+                            {r.name || <span style={{ color: T.inkPlaceholder }}>—</span>}
                             {(() => {
                               const hl = getHitterLine(team, r.num);
                               return (hl && hl.atBats > 0)
-                                ? <span style={{ color: '#7a7468', fontSize: '11px', marginLeft: '5px' }}>({hl.hits}-{hl.atBats})</span>
+                                ? <span style={{ color: T.inkMuted, fontSize: '11px', marginLeft: '5px' }}>({hl.hits}-{hl.atBats})</span>
                                 : null;
                             })()}
                           </span>
                           {st && (
                             <span style={{
-                              fontSize: '9px', fontWeight: 800, letterSpacing: '0.08em',
-                              color: '#fff', background: st.color, padding: '3px 7px', borderRadius: '10px',
+                              fontSize: '11px', fontWeight: 400, color: T.paperRaised, background: st.color, padding: '3px 7px', borderRadius: '10px',
                             }}>{st.label}</span>
                           )}
                         </div>
@@ -6833,15 +6860,13 @@ function LoopholeMatrixTagger() {
             disabled={events.length === 0}
             style={{
               flex: 1,
-              background: emailFlash ? '#e8943a' : 'transparent',
-              border: `1px solid ${events.length === 0 ? 'rgba(0,0,0,0.05)' : '#e8943a'}`,
-              color: events.length === 0 ? '#c8c4b8' : (emailFlash ? '#1a1a1a' : '#e8943a'),
+              background: emailFlash ? T.ink : 'transparent',
+              border: `1px solid ${events.length === 0 ? T.rule : T.ink}`,
+              color: events.length === 0 ? T.inkPlaceholder : (emailFlash ? T.ink : T.ink),
               padding: '13px 8px',
               borderRadius: '3px',
               fontFamily: 'inherit',
-              fontSize: '10px',
-              letterSpacing: '0.15em',
-              textTransform: 'uppercase',
+              fontSize: '11px',
               fontWeight: emailFlash ? 700 : 600,
               cursor: events.length === 0 ? 'not-allowed' : 'pointer',
               display: 'flex',
@@ -6851,24 +6876,22 @@ function LoopholeMatrixTagger() {
               transition: 'all 200ms ease',
             }}
           >
-            <Mail size={12} /> {emailFlash ? (emailPayload?.fallback ? 'Opened ↓' : 'Shared ↑') : 'Share Fingerprint'}
+            <Mail size={12} /> {emailFlash ? (emailPayload?.fallback ? 'Opened ↓' : 'Shared ↑') : 'Share fingerprint'}
           </button>
           <button
             onClick={handleEndGame}
             disabled={events.length === 0 && !gameMeta}
             style={{
               flex: 1,
-              background: endArmed ? (isUnsaved ? '#7a2a1a' : '#d94425') : 'transparent',
-              border: `1px solid ${endArmed ? (isUnsaved ? '#7a2a1a' : '#d94425') : (isUnsaved ? 'rgba(217,68,37,0.4)' : 'rgba(0,0,0,0.25)')}`,
+              background: endArmed ? T.ink : 'transparent',
+              border: `1px solid ${endArmed ? (isUnsaved ? T.ink : T.ink) : (isUnsaved ? T.rule : T.ruleStrong)}`,
               color: (events.length === 0 && !gameMeta)
-                ? '#c8c4b8'
-                : (endArmed ? '#ffffff' : (isUnsaved ? '#d94425' : '#1a1a1a')),
+                ? T.inkPlaceholder
+                : (endArmed ? T.paperRaised : (isUnsaved ? T.inkMuted : T.ink)),
               padding: '13px 8px',
               borderRadius: '3px',
               fontFamily: 'inherit',
-              fontSize: '10px',
-              letterSpacing: '0.15em',
-              textTransform: 'uppercase',
+              fontSize: '11px',
               fontWeight: endArmed ? 700 : 600,
               cursor: (events.length === 0 && !gameMeta) ? 'not-allowed' : 'pointer',
               display: 'flex',
@@ -6881,8 +6904,8 @@ function LoopholeMatrixTagger() {
             }}
           >
             {endArmed
-              ? (isUnsaved ? <><span>Not Saved</span><span style={{ fontSize: '8px', opacity: 0.9 }}>End anyway?</span></> : 'Confirm')
-              : 'End Game'}
+              ? (isUnsaved ? <><span>Not Saved</span><span style={{ fontSize: '11px', opacity: 0.9 }}>End anyway?</span></> : 'Confirm')
+              : 'End game'}
           </button>
       </div>
 
@@ -6898,16 +6921,14 @@ function LoopholeMatrixTagger() {
         <div ref={emailPanelRef} style={{
           maxWidth: '560px',
           margin: '16px auto 0',
-          background: '#fdfaf2',
-          border: '1px solid rgba(0,0,0,0.08)',
+          background: T.paperRaised,
+          border: `1px solid ${T.rule}`,
           borderRadius: '6px',
           padding: '14px',
         }}>
           <div style={{
-            fontSize: '9px',
-            color: '#7a7468',
-            letterSpacing: '0.2em',
-            textTransform: 'uppercase',
+            fontSize: '11px',
+            color: T.inkMuted,
             marginBottom: '12px',
             display: 'flex',
             justifyContent: 'space-between',
@@ -6919,7 +6940,7 @@ function LoopholeMatrixTagger() {
               style={{
                 background: 'transparent',
                 border: 'none',
-                color: '#7a7468',
+                color: T.inkMuted,
                 fontSize: '14px',
                 cursor: 'pointer',
                 padding: '0 4px',
@@ -6945,9 +6966,8 @@ function LoopholeMatrixTagger() {
                 setTimeout(() => setCopyFlash(null), 1500);
               }}
               style={{
-                width: '100%', padding: '12px', background: '#B84A2C', border: 'none',
-                borderRadius: '5px', color: '#fff', fontSize: '12px', fontWeight: 600,
-                letterSpacing: '0.05em', cursor: 'pointer', fontFamily: 'inherit',
+                width: '100%', padding: '12px', background: T.ink, border: 'none',
+                borderRadius: '5px', color: T.paperRaised, fontSize: '12px', fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit',
               }}
             >
               {copyFlash === 'json' ? '\u2713 JSON Copied' : 'Copy JSON'}
@@ -6956,8 +6976,8 @@ function LoopholeMatrixTagger() {
               href={`mailto:brandon@loophohl.com?subject=${encodeURIComponent(emailPayload.subject)}&body=${encodeURIComponent('Paste the WildCard JSON below:')}`}
               style={{
                 width: '100%', boxSizing: 'border-box', padding: '12px', background: 'transparent',
-                border: '1px solid #B84A2C', borderRadius: '5px', color: '#B84A2C', fontSize: '12px',
-                fontWeight: 600, letterSpacing: '0.05em', cursor: 'pointer', fontFamily: 'inherit',
+                border: `1px solid ${T.ink}`, borderRadius: '5px', color: T.ink, fontSize: '12px',
+                fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit',
                 textAlign: 'center', textDecoration: 'none', display: 'block',
               }}
             >
@@ -6965,13 +6985,12 @@ function LoopholeMatrixTagger() {
             </a>
           </div>
 
-          <div style={{ fontSize: '11px', color: '#5a544a', lineHeight: 1.5, marginBottom: '12px' }}>
+          <div style={{ fontSize: '11px', color: T.inkSecondary, lineHeight: 1.5, marginBottom: '12px' }}>
             Tap <em>Copy JSON</em>, then <em>Open Mail</em> and paste it into the body. Send to <strong>brandon@loophohl.com</strong>.
           </div>
 
           <div style={{
-            fontSize: '9px', color: '#7a7468', letterSpacing: '0.1em',
-            marginBottom: '6px', textTransform: 'uppercase', wordBreak: 'break-all',
+            fontSize: '11px', color: T.inkMuted, marginBottom: '6px', wordBreak: 'break-all',
           }}>
             {emailPayload.filename}
           </div>
@@ -6982,9 +7001,9 @@ function LoopholeMatrixTagger() {
             onFocus={(e) => e.target.select()}
             onClick={(e) => e.target.select()}
             style={{
-              width: '100%', boxSizing: 'border-box', background: '#f5f1e8',
-              border: '1px solid rgba(0,0,0,0.05)', borderRadius: '3px', padding: '10px',
-              fontSize: '9px', color: '#5a544a', fontFamily: 'monospace', height: '160px',
+              width: '100%', boxSizing: 'border-box', background: T.paper,
+              border: `1px solid ${T.rule}`, borderRadius: '3px', padding: '10px',
+              fontSize: '11px', color: T.inkSecondary, fontFamily: 'inherit', height: '160px',
               resize: 'vertical', whiteSpace: 'pre', overflowX: 'auto',
             }}
           />
@@ -6997,10 +7016,8 @@ function LoopholeMatrixTagger() {
         maxWidth: '560px',
         margin: '24px auto 8px',
         textAlign: 'center',
-        fontSize: '8px',
-        color: '#a8a294',
-        letterSpacing: '0.25em',
-        textTransform: 'uppercase',
+        fontSize: '11px',
+        color: T.inkFaint,
       }}>
         Powered by Loophohl
       </div>
@@ -7014,7 +7031,7 @@ function LoopholeMatrixTagger() {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.4)',
+            background: T.scrim,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -7024,18 +7041,18 @@ function LoopholeMatrixTagger() {
         >
           <div
             style={{
-              background: '#fdfaf2',
+              background: T.paperRaised,
               borderRadius: '12px',
               padding: '20px',
               maxWidth: '320px',
               width: '100%',
-              boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
+              boxShadow: `0 10px 30px ${T.scrim}`,
             }}
           >
-            <div style={{ fontSize: '11px', fontWeight: 800, letterSpacing: '0.18em', color: '#d94425', textTransform: 'uppercase', marginBottom: '10px' }}>
+            <div style={{ fontSize: '11px', fontWeight: 400, color: T.inkMuted, marginBottom: '10px' }}>
               Lineup Check
             </div>
-            <div style={{ fontSize: '15px', color: '#1a1a1a', lineHeight: 1.4, marginBottom: '16px' }}>
+            <div style={{ fontSize: '15px', color: T.ink, lineHeight: 1.4, marginBottom: '16px' }}>
               That's {lineupPrompt.proposedSize} batters for the{' '}
               <strong>{lineupPrompt.side === 'home' ? (gameMeta?.homeTeam || 'home') : (gameMeta?.awayTeam || 'away')}</strong>.
               Is the next batter the leadoff hitter?
@@ -7060,15 +7077,14 @@ function LoopholeMatrixTagger() {
                   setLineupPrompt(null);
                 }}
                 style={{
-                  background: '#d94425',
-                  color: '#fff',
+                  background: T.ink,
+                  color: T.paperRaised,
                   border: 'none',
                   borderRadius: '8px',
                   padding: '14px',
                   fontFamily: 'inherit',
                   fontSize: '14px',
-                  fontWeight: 800,
-                  letterSpacing: '0.05em',
+                  fontWeight: 400,
                   cursor: 'pointer',
                 }}
               >
@@ -7078,13 +7094,13 @@ function LoopholeMatrixTagger() {
                 onClick={() => setLineupPrompt(null)}
                 style={{
                   background: 'transparent',
-                  color: '#1a1a1a',
-                  border: '1px solid rgba(0,0,0,0.18)',
+                  color: T.ink,
+                  border: `1px solid ${T.ruleStrong}`,
                   borderRadius: '8px',
                   padding: '14px',
                   fontFamily: 'inherit',
                   fontSize: '14px',
-                  fontWeight: 700,
+                  fontWeight: 400,
                   cursor: 'pointer',
                 }}
               >
@@ -7107,24 +7123,24 @@ function LoopholeMatrixTagger() {
         const canFlip = proposedSize >= 1;
         return (
           <div style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
+            position: 'fixed', inset: 0, background: T.scrim,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             zIndex: 80, padding: '20px',
           }}>
             <div style={{
-              background: '#fdfaf2', borderRadius: '12px', padding: '20px',
-              maxWidth: '320px', width: '100%', boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
+              background: T.paperRaised, borderRadius: '12px', padding: '20px',
+              maxWidth: '320px', width: '100%', boxShadow: `0 10px 30px ${T.scrim}`,
             }}>
-              <div style={{ fontSize: '11px', fontWeight: 800, letterSpacing: '0.18em', color: '#d94425', textTransform: 'uppercase', marginBottom: '10px' }}>
+              <div style={{ fontSize: '11px', fontWeight: 400, color: T.inkMuted, marginBottom: '10px' }}>
                 Lineup
               </div>
               {canFlip ? (
-                <div style={{ fontSize: '15px', color: '#1a1a1a', lineHeight: 1.4, marginBottom: '16px' }}>
+                <div style={{ fontSize: '15px', color: T.ink, lineHeight: 1.4, marginBottom: '16px' }}>
                   Is this the leadoff hitter, with the order starting over? This sets{' '}
                   <strong>{teamName}</strong>'s lineup to <strong>{proposedSize}</strong> batter{proposedSize === 1 ? '' : 's'}.
                 </div>
               ) : (
-                <div style={{ fontSize: '15px', color: '#1a1a1a', lineHeight: 1.4, marginBottom: '16px' }}>
+                <div style={{ fontSize: '15px', color: T.ink, lineHeight: 1.4, marginBottom: '16px' }}>
                   Tap this when the leadoff hitter comes up again to start the order over. The first batter needs to bat at least once first.
                 </div>
               )}
@@ -7140,9 +7156,8 @@ function LoopholeMatrixTagger() {
                       setManualLineupDialog(null);
                     }}
                     style={{
-                      background: '#d94425', color: '#fff', border: 'none', borderRadius: '8px',
-                      padding: '14px', fontFamily: 'inherit', fontSize: '14px', fontWeight: 800,
-                      letterSpacing: '0.05em', cursor: 'pointer',
+                      background: T.ink, color: T.paperRaised, border: 'none', borderRadius: '8px',
+                      padding: '14px', fontFamily: 'inherit', fontSize: '14px', fontWeight: 600, cursor: 'pointer',
                     }}
                   >
                     Yes — start order over ({proposedSize})
@@ -7151,9 +7166,9 @@ function LoopholeMatrixTagger() {
                 <button
                   onClick={() => setManualLineupDialog(null)}
                   style={{
-                    background: 'transparent', color: '#1a1a1a', border: '1px solid rgba(0,0,0,0.18)',
+                    background: 'transparent', color: T.ink, border: `1px solid ${T.ruleStrong}`,
                     borderRadius: '8px', padding: '14px', fontFamily: 'inherit', fontSize: '14px',
-                    fontWeight: 700, cursor: 'pointer',
+                    fontWeight: 400, cursor: 'pointer',
                   }}
                 >
                   {canFlip ? 'No \u2014 keep going' : 'OK'}
@@ -7179,11 +7194,11 @@ function LoopholeMatrixTagger() {
 //   so the user knows they're resuming, not starting fresh
 // ---------------------------------------------------------------------------
 
-const LAUNCHER_BG = '#f5efe2';
-const LAUNCHER_CARD_BG = '#fbf6ea';
-const LAUNCHER_RED = '#d94425';
-const LAUNCHER_INK = '#1a1a1a';
-const LAUNCHER_MUTED = '#7a7464';
+const LAUNCHER_BG = T.paper;
+const LAUNCHER_CARD_BG = T.paperRaised;
+const LAUNCHER_RED = T.ink;
+const LAUNCHER_INK = T.ink;
+const LAUNCHER_MUTED = T.inkMuted;
 
 function WildCardLauncher() {
   const [opened, setOpened] = useState(false);
@@ -7231,8 +7246,8 @@ function WildCardLauncher() {
         background: LAUNCHER_CARD_BG,
         borderRadius: '16px',
         padding: '40px 28px 32px',
-        boxShadow: '0 1px 2px rgba(0,0,0,0.04), 0 8px 32px rgba(0,0,0,0.08)',
-        border: '1px solid rgba(0,0,0,0.04)',
+        boxShadow: `0 1px 2px ${T.rule}, 0 8px 32px ${T.rule}`,
+        border: `1px solid ${T.rule}`,
         textAlign: 'center',
       }}>
         {/* Brand mark */}
@@ -7247,8 +7262,7 @@ function WildCardLauncher() {
         {/* Wordmark */}
         <div style={{
           fontSize: '28px',
-          fontWeight: 700,
-          letterSpacing: '-0.01em',
+          fontWeight: 300,
           color: LAUNCHER_INK,
           marginBottom: '4px',
         }}>
@@ -7256,39 +7270,35 @@ function WildCardLauncher() {
         </div>
         <div style={{
           fontSize: '11px',
-          letterSpacing: '0.22em',
-          textTransform: 'uppercase',
           color: LAUNCHER_MUTED,
           marginBottom: '32px',
         }}>
-          Pitch-Level Tagger
+          Pitch-level tagger
         </div>
 
         {/* Resume banner — only renders when prior session detected */}
         {resumeInfo && (
           <div style={{
-            background: '#fff',
-            border: '1px solid rgba(0,0,0,0.06)',
+            background: T.paperRaised,
+            border: `1px solid ${T.rule}`,
             borderRadius: '10px',
             padding: '12px 14px',
             marginBottom: '20px',
             textAlign: 'left',
           }}>
             <div style={{
-              fontSize: '9px',
-              letterSpacing: '0.2em',
-              textTransform: 'uppercase',
+              fontSize: '11px',
               color: LAUNCHER_RED,
-              fontWeight: 600,
+              fontWeight: 400,
               marginBottom: '4px',
             }}>
               Game in progress
             </div>
-            <div style={{ fontSize: '14px', color: LAUNCHER_INK, fontWeight: 600 }}>
+            <div style={{ fontSize: '14px', color: LAUNCHER_INK, fontWeight: 400 }}>
               {resumeInfo.away} @ {resumeInfo.home}
             </div>
             <div style={{ fontSize: '11px', color: LAUNCHER_MUTED, marginTop: '2px' }}>
-              {resumeInfo.format} · {resumeInfo.eventCount} event{resumeInfo.eventCount === 1 ? '' : 's'} logged
+              {resumeInfo.format}  {resumeInfo.eventCount} event{resumeInfo.eventCount === 1 ? '' : 's'} logged
             </div>
           </div>
         )}
@@ -7299,15 +7309,14 @@ function WildCardLauncher() {
           style={{
             width: '100%',
             background: LAUNCHER_RED,
-            color: '#fff',
+            color: T.paperRaised,
             border: 'none',
             borderRadius: '10px',
             padding: '16px',
             fontSize: '16px',
-            fontWeight: 600,
-            letterSpacing: '0.02em',
+            fontWeight: 400,
             cursor: 'pointer',
-            boxShadow: '0 1px 2px rgba(217,68,37,0.3)',
+            boxShadow: `0 1px 2px ${T.rule}`,
           }}
         >
           {resumeInfo ? 'Resume Game' : 'Open Tagger'}
@@ -7316,12 +7325,10 @@ function WildCardLauncher() {
         {/* Footer */}
         <div style={{
           marginTop: '28px',
-          fontSize: '8px',
+          fontSize: '11px',
           color: LAUNCHER_MUTED,
-          letterSpacing: '0.25em',
-          textTransform: 'uppercase',
         }}>
-          LoopHohl · app.loophohl.com
+          LoopHohl   app.loophohl.com
         </div>
       </div>
     </div>
