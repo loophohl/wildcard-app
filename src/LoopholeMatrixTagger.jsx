@@ -338,10 +338,15 @@ const FieldDiamond = ({
                 one filled element the screen is allowed. */}
             <polygon points="160,260 60,160 160,60 260,160"
                      fill="none" stroke={T.ruleStrong} strokeWidth="1"/>
-            {/* Infield arc — the grass line separating infield from outfield.
-                Struck from the mound so the infielders sit inside it and the
-                outfielders sit beyond it, the way it reads on a real field. */}
-            <path d="M 31 131 A 135 135 0 0 1 289 131"
+            {/* Foul lines, home out past the corner bags. The arc has to land on
+                these to read correctly, so they are drawn first. */}
+            <line x1="160" y1="260" x2="0"   y2="100" stroke={T.ruleStrong} strokeWidth="1"/>
+            <line x1="160" y1="260" x2="320" y2="100" stroke={T.ruleStrong} strokeWidth="1"/>
+            {/* Infield arc — the grass line between infield and outfield. Struck
+                from the mound and stopping at the foul lines, behind the corner
+                infielders, so 1B and 3B fall inside the dirt the way they do on a
+                real field. Endpoints sit exactly on the foul lines above. */}
+            <path d="M 14 114 A 156 156 0 0 1 306 114"
                   fill="none" stroke={T.rule} strokeWidth="1"/>
             {/* Pitcher's mound circle */}
             <circle cx="160" cy="170" r="14" fill="none" stroke={T.rule} strokeWidth="1"/>
@@ -572,9 +577,9 @@ const FieldDiamond = ({
             const positionLayout = {
               'P':  { left: '50%',   top: '39%' },
               'C':  { left: '50%',   top: '94%' },
-              '1B': { left: '88%',   top: '36%' },
+              '1B': { left: '85%',   top: '36%' },
               '2B': { left: '67%',   top: '23.5%' },
-              '3B': { left: '12%',   top: '36%' },
+              '3B': { left: '15%',   top: '36%' },
               'SS': { left: '33%',   top: '23.5%' },
               'LF': { left: '16%',   top: '8%' },
               'CF': { left: '50%',   top: '3%' },
@@ -610,7 +615,9 @@ const FieldDiamond = ({
                     // pulse) are what the scorer is acting on. When a fielder
                     // IS tapped (during sequence build), they flip to brand red
                     // so the active sequence stays visible.
-                    background: isTapped ? T.ink : 'transparent',
+                    // Paper, not transparent: the foul lines and the infield arc
+                    // pass behind these discs and would otherwise show through them.
+                    background: isTapped ? T.ink : T.paper,
                     border: `1px solid ${isTapped ? T.ink : T.ruleStrong}`,
                     borderRadius: '50%',
                     width: '50px',
