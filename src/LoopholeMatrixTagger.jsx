@@ -302,7 +302,7 @@ const FieldDiamond = ({
   };
 
   return (
-        <div style={{ width: '100%', maxWidth: '460px', margin: '0 auto 0', position: 'relative' }}>
+        <div style={{ width: '100%', maxWidth: '460px', margin: '24px auto 0', position: 'relative' }}>
         {/* Keyframes used by both the Pitch CTA button and the untouched-runner
             pulse. Defined at the top of the component so the animations work
             whether or not the runner layer renders. */}
@@ -328,11 +328,11 @@ const FieldDiamond = ({
           style={{
             position: 'relative',
             width: '100%',
-            aspectRatio: '1',
+            aspectRatio: '0.86',
             opacity: armedRunner ? 0.55 : 1,
             transition: 'opacity 120ms ease',
           }}>
-          <svg viewBox="0 0 320 320" style={{ width: '100%', height: '100%', display: 'block' }}>
+          <svg viewBox="0 0 320 320" preserveAspectRatio="none" style={{ width: '100%', height: '100%', display: 'block' }}>
             {/* Hairline geometry only — no dirt or grass rendering. The field is
                 implied by the basepaths; anything filled here would compete with the
                 one filled element the screen is allowed. */}
@@ -348,8 +348,6 @@ const FieldDiamond = ({
                 real field. Endpoints sit exactly on the foul lines above. */}
             <path d="M 14 114 A 156 156 0 0 1 306 114"
                   fill="none" stroke={T.rule} strokeWidth="1"/>
-            {/* Pitcher's mound circle */}
-            <circle cx="160" cy="170" r="14" fill="none" stroke={T.rule} strokeWidth="1"/>
             {/* Base markers — hollow hairline squares; occupancy is carried by the
                 runner tokens, not by the bags. */}
             <rect x="155" y="255" width="10" height="10" fill="none" stroke={T.ruleStrong} strokeWidth="1"/>
@@ -527,7 +525,7 @@ const FieldDiamond = ({
                 style={{
                   position: 'absolute',
                   left: '50%',
-                  top: '39%',
+                  top: '53%',
                   transform: 'translate(-50%, -50%)',
                   width: '46px',
                   height: '46px',
@@ -575,15 +573,19 @@ const FieldDiamond = ({
             //   3B fielder mirrored from (17,42) to (12,36)
             //   Catcher pulled below home plate from (50,90) to (50,94)
             const positionLayout = {
-              'P':  { left: '50%',   top: '39%' },
-              'C':  { left: '50%',   top: '94%' },
+              // P sits on the mound and replaces the drawn mound circle.
+              'P':  { left: '50%',   top: '53%' },
+              // Catcher pulled up toward the plate, stopping short of touching it.
+              'C':  { left: '50%',   top: '90%' },
               '1B': { left: '85%',   top: '36%' },
-              '2B': { left: '67%',   top: '23.5%' },
+              // Middle infielders play deeper, up toward the arc.
+              '2B': { left: '68%',   top: '17%' },
               '3B': { left: '15%',   top: '36%' },
-              'SS': { left: '33%',   top: '23.5%' },
-              'LF': { left: '16%',   top: '8%' },
-              'CF': { left: '50%',   top: '3%' },
-              'RF': { left: '84%',   top: '8%' },
+              'SS': { left: '32%',   top: '17%' },
+              // Corner outfielders open out toward the lines and off the top edge.
+              'LF': { left: '10%',   top: '14%' },
+              'CF': { left: '50%',   top: '6%' },
+              'RF': { left: '90%',   top: '14%' },
             };
             return fielderOptions.map((f) => {
               const pos = positionLayout[f.code];
@@ -6724,7 +6726,7 @@ function LoopholeMatrixTagger() {
         };
         return (
           <div style={{
-            maxWidth: '560px', margin: '12px auto 0',
+            maxWidth: '560px', margin: '8px auto 0',
             border: `1px solid ${T.rule}`, borderRadius: '6px',
             background: T.paperRaised, overflow: 'hidden',
           }}>
@@ -6733,7 +6735,7 @@ function LoopholeMatrixTagger() {
               onClick={() => setLineupPanelOpen(o => !o)}
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '11px 14px', cursor: 'pointer',
+                padding: '8px 14px', cursor: 'pointer',
               }}
             >
               <div style={{ fontSize: '11px', color: T.inkMuted, fontWeight: 400 }}>
@@ -6822,7 +6824,7 @@ function LoopholeMatrixTagger() {
       })()}
       <div style={{
         maxWidth: '560px',
-        margin: '16px auto 0',
+        margin: '8px auto 0',
         display: 'flex',
         gap: '8px',
       }}>
@@ -6834,7 +6836,7 @@ function LoopholeMatrixTagger() {
               background: emailFlash ? T.ink : 'transparent',
               border: `1px solid ${events.length === 0 ? T.rule : T.ink}`,
               color: events.length === 0 ? T.inkPlaceholder : (emailFlash ? T.ink : T.ink),
-              padding: '13px 8px',
+              padding: '11px 8px',
               borderRadius: '3px',
               fontFamily: 'inherit',
               fontSize: '11px',
@@ -6859,7 +6861,7 @@ function LoopholeMatrixTagger() {
               color: (events.length === 0 && !gameMeta)
                 ? T.inkPlaceholder
                 : (endArmed ? T.paperRaised : (isUnsaved ? T.inkMuted : T.ink)),
-              padding: '13px 8px',
+              padding: '11px 8px',
               borderRadius: '3px',
               fontFamily: 'inherit',
               fontSize: '11px',
@@ -6985,7 +6987,7 @@ function LoopholeMatrixTagger() {
 
       <div style={{
         maxWidth: '560px',
-        margin: '24px auto 8px',
+        margin: '12px auto 4px',
         textAlign: 'center',
         fontSize: '11px',
         color: T.inkFaint,
