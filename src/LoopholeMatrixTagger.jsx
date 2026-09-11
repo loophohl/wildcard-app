@@ -295,10 +295,10 @@ const FieldDiamond = ({
   // Base screen positions (% within the square field) for the SAFE/OUT overlay.
   // Match the in-field basePositions used by the runner layer.
   const binBasePositions = {
-    '1B':   { left: '82%', top: '50%' },
-    '2B':   { left: '50%', top: '18%' },
-    '3B':   { left: '18%', top: '50%' },
-    'home': { left: '50%', top: '80%' },
+    '1B':   { left: '79.7%', top: '58.1%' },
+    '2B':   { left: '50%',   top: '32.5%' },
+    '3B':   { left: '20.3%', top: '58.1%' },
+    'home': { left: '50%',   top: '83.8%' },
   };
 
   return (
@@ -336,24 +336,24 @@ const FieldDiamond = ({
             {/* Hairline geometry only — no dirt or grass rendering. The field is
                 implied by the basepaths; anything filled here would compete with the
                 one filled element the screen is allowed. */}
-            <polygon points="160,260 60,160 160,60 260,160"
+            <polygon points="160,268 65,186 160,104 255,186"
                      fill="none" stroke={T.ruleStrong} strokeWidth="1"/>
             {/* Foul lines, home out past the corner bags. The arc has to land on
                 these to read correctly, so they are drawn first. */}
-            <line x1="160" y1="260" x2="0"   y2="100" stroke={T.ruleStrong} strokeWidth="1"/>
-            <line x1="160" y1="260" x2="320" y2="100" stroke={T.ruleStrong} strokeWidth="1"/>
+            <line x1="160" y1="268" x2="0"   y2="130.4" stroke={T.ruleStrong} strokeWidth="1"/>
+            <line x1="160" y1="268" x2="320" y2="130.4" stroke={T.ruleStrong} strokeWidth="1"/>
             {/* Infield arc — the grass line between infield and outfield. Struck
                 from the mound and stopping at the foul lines, behind the corner
                 infielders, so 1B and 3B fall inside the dirt the way they do on a
                 real field. Endpoints sit exactly on the foul lines above. */}
-            <path d="M 14 114 A 156 156 0 0 1 306 114"
+            <path d="M 22.7 149.9 A 145 124.7 0 0 1 297.3 149.9"
                   fill="none" stroke={T.rule} strokeWidth="1"/>
             {/* Base markers — hollow hairline squares; occupancy is carried by the
                 runner tokens, not by the bags. */}
-            <rect x="155" y="255" width="10" height="10" fill="none" stroke={T.ruleStrong} strokeWidth="1"/>
-            <rect x="255" y="155" width="10" height="10" fill="none" stroke={T.ruleStrong} strokeWidth="1"/>
-            <rect x="155" y="55"  width="10" height="10" fill="none" stroke={T.ruleStrong} strokeWidth="1"/>
-            <rect x="55"  y="155" width="10" height="10" fill="none" stroke={T.ruleStrong} strokeWidth="1"/>
+            <rect x="155"   y="263.7" width="10" height="8.6" fill="none" stroke={T.ruleStrong} strokeWidth="1"/>
+            <rect x="250"   y="181.7" width="10" height="8.6" fill="none" stroke={T.ruleStrong} strokeWidth="1"/>
+            <rect x="155"   y="99.7"  width="10" height="8.6" fill="none" stroke={T.ruleStrong} strokeWidth="1"/>
+            <rect x="60"    y="181.7" width="10" height="8.6" fill="none" stroke={T.ruleStrong} strokeWidth="1"/>
           </svg>
 
           {/* PITCH button on the mound (mirrors GameChanger). Circle matching the
@@ -405,7 +405,7 @@ const FieldDiamond = ({
               <div style={{
                 position: 'absolute',
                 left: '38%',
-                top: '82%',
+                top: '86%',
                 transform: 'translate(-50%, -50%)',
                 zIndex: 7,
                 display: 'flex',
@@ -447,7 +447,7 @@ const FieldDiamond = ({
                 style={{
                   position: 'absolute',
                   left: '38%',
-                  top: '82%',
+                  top: '86%',
                   transform: 'translate(-50%, -50%)',
                   width: '50px',
                   height: '50px',
@@ -525,7 +525,7 @@ const FieldDiamond = ({
                 style={{
                   position: 'absolute',
                   left: '50%',
-                  top: '53%',
+                  top: '59.4%',
                   transform: 'translate(-50%, -50%)',
                   width: '46px',
                   height: '46px',
@@ -574,18 +574,18 @@ const FieldDiamond = ({
             //   Catcher pulled below home plate from (50,90) to (50,94)
             const positionLayout = {
               // P sits on the mound and replaces the drawn mound circle.
-              'P':  { left: '50%',   top: '53%' },
+              'P':  { left: '50%',   top: '59.4%' },
               // Catcher pulled up toward the plate, stopping short of touching it.
-              'C':  { left: '50%',   top: '90%' },
-              '1B': { left: '85%',   top: '36%' },
+              'C':  { left: '50%',   top: '93%' },
+              '1B': { left: '80%',   top: '47%' },
               // Middle infielders play deeper, up toward the arc.
-              '2B': { left: '68%',   top: '17%' },
-              '3B': { left: '15%',   top: '36%' },
-              'SS': { left: '32%',   top: '17%' },
+              '2B': { left: '70%',   top: '33%' },
+              '3B': { left: '20%',   top: '47%' },
+              'SS': { left: '30%',   top: '33%' },
               // Corner outfielders open out toward the lines and off the top edge.
-              'LF': { left: '10%',   top: '14%' },
-              'CF': { left: '50%',   top: '6%' },
-              'RF': { left: '90%',   top: '14%' },
+              'LF': { left: '8%',    top: '11%' },
+              'CF': { left: '50%',   top: '4%' },
+              'RF': { left: '92%',   top: '11%' },
             };
             return fielderOptions.map((f) => {
               const pos = positionLayout[f.code];
@@ -685,10 +685,10 @@ const FieldDiamond = ({
             // (and where scoring runner tokens would sit). Pulled up from 92% to 80%
             // so the safe target doesn't overlap the catcher button (top:94%).
             const basePositions = {
-              '1B':   { left: '82%', top: '50%' },
-              '2B':   { left: '50%', top: '18%' },
-              '3B':   { left: '18%', top: '50%' },
-              'home': { left: '50%', top: '80%' },
+              '1B':   { left: '79.7%', top: '58.1%' },
+              '2B':   { left: '50%',   top: '32.5%' },
+              '3B':   { left: '20.3%', top: '58.1%' },
+              'home': { left: '50%',   top: '83.8%' },
             };
             // Source → numeric base for clockwise comparison. Batter starts at home (0).
             const sourceBaseNum = { 'batter': 0, '1B': 1, '2B': 2, '3B': 3 };
