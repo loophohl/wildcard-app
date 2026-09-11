@@ -350,10 +350,14 @@ const FieldDiamond = ({
                   fill="none" stroke={T.rule} strokeWidth="1"/>
             {/* Base markers — hollow hairline squares; occupancy is carried by the
                 runner tokens, not by the bags. */}
-            <rect x="155"   y="263.7" width="10" height="8.6" fill="none" stroke={T.ruleStrong} strokeWidth="1"/>
-            <rect x="250"   y="181.7" width="10" height="8.6" fill="none" stroke={T.ruleStrong} strokeWidth="1"/>
-            <rect x="155"   y="99.7"  width="10" height="8.6" fill="none" stroke={T.ruleStrong} strokeWidth="1"/>
-            <rect x="60"    y="181.7" width="10" height="8.6" fill="none" stroke={T.ruleStrong} strokeWidth="1"/>
+            <polygon points="160,268 153,261.98 153,255.96 167,255.96 167,261.98"
+                     fill={T.paper} stroke={T.ruleStrong} strokeWidth="1"/>
+            <polygon points="255,186 247,179.12 239,186 247,192.88"
+                     fill={T.paper} stroke={T.ruleStrong} strokeWidth="1"/>
+            <polygon points="160,104 168,110.88 160,117.76 152,110.88"
+                     fill={T.paper} stroke={T.ruleStrong} strokeWidth="1"/>
+            <polygon points="65,186 73,179.12 81,186 73,192.88"
+                     fill={T.paper} stroke={T.ruleStrong} strokeWidth="1"/>
           </svg>
 
           {/* PITCH button on the mound (mirrors GameChanger). Circle matching the
@@ -577,10 +581,10 @@ const FieldDiamond = ({
               'P':  { left: '50%',   top: '59.4%' },
               // Catcher pulled up toward the plate, stopping short of touching it.
               'C':  { left: '50%',   top: '93%' },
-              '1B': { left: '80%',   top: '42.5%' },
+              '1B': { left: '83.4%', top: '42.5%' },
               // Middle infielders play deeper, up toward the arc.
               '2B': { left: '70%',   top: '33%' },
-              '3B': { left: '20%',   top: '42.5%' },
+              '3B': { left: '16.6%', top: '42.5%' },
               'SS': { left: '30%',   top: '33%' },
               // Corner outfielders open out toward the lines and off the top edge.
               'LF': { left: '8%',    top: '11%' },
