@@ -577,10 +577,10 @@ const FieldDiamond = ({
               'P':  { left: '50%',   top: '59.4%' },
               // Catcher pulled up toward the plate, stopping short of touching it.
               'C':  { left: '50%',   top: '93%' },
-              '1B': { left: '80%',   top: '47%' },
+              '1B': { left: '76%',   top: '44.5%' },
               // Middle infielders play deeper, up toward the arc.
               '2B': { left: '70%',   top: '33%' },
-              '3B': { left: '20%',   top: '47%' },
+              '3B': { left: '24%',   top: '44.5%' },
               'SS': { left: '30%',   top: '33%' },
               // Corner outfielders open out toward the lines and off the top edge.
               'LF': { left: '8%',    top: '11%' },
