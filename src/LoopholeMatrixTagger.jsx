@@ -196,11 +196,33 @@ const FieldDiamond = ({
   // into a row ABOVE the field (so the runner token can't cover them, and the
   // own-base OUT is reachable), and dim the field below to focus the choice.
   // Bins are oversized — the dimmed field can't be mis-tapped, so we can afford it.
-  const armedSrcNum = armedRunner != null
-    ? ({ 'batter': 0, '1B': 1, '2B': 2, '3B': 3 })[armedRunner]
+  // Drag-to-base, the way GameChanger does it: the scorer drags a runner disc and
+  // each valid destination wears a halo. When the dragged disc's centre crosses into
+  // a halo, that base's SAFE/OUT pair appears; crossing into the next base's halo
+  // moves the pair there. Releasing leaves the pair up so it can be tapped.
+  const fieldRef = React.useRef(null);
+  const [drag, setDrag] = React.useState(null);       // { source, dx, dy } while held
+  const [binBase, setBinBase] = React.useState(null); // base whose SAFE/OUT show
+  const dragMovedRef = React.useRef(false);           // drag vs tap on pointerup
+
+  const HALO = 28; // halo radius — disc-shaped, sitting 3px proud so it stays
+                   // visible as a ring even when a disc is parked on the base
+
+  // Centre of a base in px within the field box, from its % position.
+  const basePx = (key) => {
+    const el = fieldRef.current;
+    const pos = binBasePositions[key];
+    if (!el || !pos) return null;
+    const r = el.getBoundingClientRect();
+    return { x: (parseFloat(pos.left) / 100) * r.width, y: (parseFloat(pos.top) / 100) * r.height };
+  };
+
+  const activeRunner = (drag && drag.source) || armedRunner;
+  const armedSrcNum = activeRunner != null
+    ? ({ 'batter': 0, '1B': 1, '2B': 2, '3B': 3 })[activeRunner]
     : null;
-  const binDestBaseNum = { '1B': 1, '2B': 2, '3B': 3, 'home': 4 };
-  const binOwnBaseKey = armedRunner;
+  const binDestBaseNum = { '1B': 1, '2B': 2, '3B': 3 };
+  const binOwnBaseKey = activeRunner;
   const binDestinations = armedSrcNum != null
     ? Object.entries(binDestBaseNum)
         .filter(([key, num]) => {
@@ -324,7 +346,8 @@ const FieldDiamond = ({
             overlay layer ABOVE this dimmed field (sibling below), positioned on
             each base. */}
         <div
-          onClick={() => { if (armedRunner && onRunnerTokenTap) onRunnerTokenTap(armedRunner); }}
+          ref={fieldRef}
+          onClick={() => { if (armedRunner && onRunnerTokenTap) { setBinBase(null); onRunnerTokenTap(armedRunner); } }}
           style={{
             position: 'relative',
             width: '100%',
@@ -779,28 +802,75 @@ const FieldDiamond = ({
                   // Exiting tokens (scored / out) — terminal. Slide to the spot, fade,
                   // recolor: green ring for a score, gray for an out. Non-interactive.
                   const exitColor = exiting === 'scored' ? T.ink : T.inkPlaceholder;
+                  const isActive = isArmed || !!(drag && drag.source === source);
                   return (
                     <button
                       key={`runner-${source}`}
-                      onClick={(e) => { e.stopPropagation(); if (!exiting && !waiting && onRunnerTokenTap) onRunnerTokenTap(source); }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // A drag already resolved where this disc is going; don't let
+                        // the closing click toggle the arm back off.
+                        if (dragMovedRef.current) { dragMovedRef.current = false; return; }
+                        if (!exiting && !waiting && onRunnerTokenTap) { setBinBase(null); onRunnerTokenTap(source); }
+                      }}
+                      onPointerDown={(e) => {
+                        if (exiting || waiting) return;
+                        e.stopPropagation();
+                        e.currentTarget.setPointerCapture(e.pointerId);
+                        dragMovedRef.current = false;
+                        setDrag({ source, dx: 0, dy: 0, ox: e.clientX, oy: e.clientY });
+                      }}
+                      onPointerMove={(e) => {
+                        if (!drag || drag.source !== source) return;
+                        const dx = e.clientX - drag.ox;
+                        const dy = e.clientY - drag.oy;
+                        if (Math.abs(dx) > 4 || Math.abs(dy) > 4) dragMovedRef.current = true;
+                        setDrag(d => (d && d.source === source ? { ...d, dx, dy } : d));
+                        // Hit-test the disc's centre against each destination halo.
+                        const el = fieldRef.current;
+                        if (!el) return;
+                        const r = el.getBoundingClientRect();
+                        const cx = e.clientX - r.left;
+                        const cy = e.clientY - r.top;
+                        let over = null;
+                        for (const key of binDestinations) {
+                          const c = basePx(key);
+                          if (c && Math.hypot(cx - c.x, cy - c.y) <= HALO) { over = key; break; }
+                        }
+                        if (over !== binBase) setBinBase(over);
+                      }}
+                      onPointerUp={(e) => {
+                        if (!drag || drag.source !== source) return;
+                        e.currentTarget.releasePointerCapture?.(e.pointerId);
+                        setDrag(null);
+                        // Dragging a disc arms it, so the pair that is now showing
+                        // belongs to this runner.
+                        if (dragMovedRef.current && armedRunner !== source && onRunnerTokenTap) onRunnerTokenTap(source);
+                      }}
+                      onPointerCancel={() => { setDrag(null); }}
                       disabled={!!exiting || !!waiting}
                       aria-label={isBatter ? 'Batter' : `Runner from ${source}`}
                       style={{
                         position: 'absolute',
                         left: position.left,
                         top: position.top,
-                        transform: exiting ? 'translate(-50%, -50%) scale(0.7)' : 'translate(-50%, -50%)',
+                        touchAction: 'none',
+                        transform: exiting
+                          ? 'translate(-50%, -50%) scale(0.7)'
+                          : (drag && drag.source === source
+                              ? `translate(calc(-50% + ${drag.dx}px), calc(-50% + ${drag.dy}px))`
+                              : 'translate(-50%, -50%)'),
                         width: '50px',
                         height: '50px',
                         borderRadius: '50%',
-                        background: exiting ? T.paperRaised : (isArmed ? accent : T.paperRaised),
+                        background: exiting ? T.paperRaised : (isActive ? accent : T.paperRaised),
                         border: `2px solid ${exiting ? exitColor : accent}`,
-                        color: exiting ? exitColor : (isArmed ? T.paperRaised : accent),
+                        color: exiting ? exitColor : (isActive ? T.paperRaised : accent),
                         fontSize: '11px',
                         fontWeight: 400,
                         cursor: exiting ? 'default' : 'pointer',
                         padding: 0,
-                        zIndex: (exiting || waiting) ? 3 : 5,
+                        zIndex: (drag && drag.source === source) ? 30 : ((exiting || waiting) ? 3 : 5),
                         opacity: (exiting || waiting) ? 0 : 1,
                         boxShadow: isArmed
                           ? `0 0 0 4px ${armedShadow}, 0 2px 4px ${T.ruleStrong}`
@@ -829,27 +899,50 @@ const FieldDiamond = ({
             );
           })()}
         </div>
-        {/* SAFE / OUT — two plain rectangles, SAFE above OUT with a gap between
-            them so there is no shared edge to mis-hit. Hairline borders, ink type,
-            paper ground: they read as controls without adding a filled block.
-            Rendered per valid destination and only while a runner is armed; tapping
-            the runner again (or another runner) dismisses without recording. */}
-        {armedRunner && binDestinations.map((baseKey) => {
+        {/* Halos — drop targets on every valid destination, same size and shape as
+            a runner disc. They appear while a runner is armed or being dragged, so
+            the scorer can see where the disc can land. */}
+        {(armedRunner || drag) && binDestinations.map((baseKey) => {
+          const pos = binBasePositions[baseKey];
+          if (!pos) return null;
+          const isOver = binBase === baseKey;
+          const tappable = !!armedRunner && !drag;
+          return (
+            <div
+              key={`halo-${baseKey}`}
+              onClick={tappable ? (e) => { e.stopPropagation(); setBinBase(baseKey); } : undefined}
+              style={{
+                position: 'absolute',
+                left: pos.left,
+                top: pos.top,
+                transform: 'translate(-50%, -50%)',
+                width: `${HALO * 2}px`,
+                height: `${HALO * 2}px`,
+                borderRadius: '50%',
+                border: `1px ${isOver ? 'solid' : 'dashed'} ${isOver ? T.ink : T.ruleStrong}`,
+                background: 'transparent',
+                pointerEvents: tappable ? 'auto' : 'none',
+                cursor: tappable ? 'pointer' : 'default',
+                zIndex: 12,
+              }}
+            />
+          );
+        })}
+
+        {/* SAFE / OUT — two plain rectangles, SAFE above OUT with a gap between them
+            so there is no shared edge to mis-hit. Hairline borders, ink type, paper
+            ground. Only the base the disc was dragged onto shows a pair, and it sits
+            centred on that base rather than out in foul ground. */}
+        {binBase && (() => {
+          const baseKey = binBase;
           const pos = binBasePositions[baseKey];
           if (!pos) return null;
           const isOwn = baseKey === binOwnBaseKey;
-          const W = 76;       // bin width
-          const H = 34;       // each rectangle's height
-          const GAP = 8;      // gap between SAFE and OUT — no shared edge
-          // Push the pair off its base so the base disc and its number stay readable
-          // underneath. 69px clears the disc radius plus half the pair. The corners
-          // go down into foul ground; 2B goes up into the outfield. Home goes UP into
-          // the empty infield — beside it on either side collides with the corner
-          // pairs at phone width, and below it runs off the box past the catcher.
-          const NUDGE = { '1B': [0, 69], '3B': [0, 69], '2B': [0, -69], 'home': [0, -76] };
-          const [dx, dy] = NUDGE[baseKey] || [0, 0];
+          const W = 76;  // bin width
+          const H = 34;  // each rectangle's height
+          const GAP = 54; // clears the halo between SAFE and OUT — no shared edge
           const binBtn = {
-            width: '100%',
+            width: `${W}px`,
             height: `${H}px`,
             borderRadius: 0,
             background: T.paperRaised,
@@ -871,26 +964,25 @@ const FieldDiamond = ({
                 position: 'absolute',
                 left: pos.left,
                 top: pos.top,
-                transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`,
+                transform: 'translate(-50%, -50%)',
                 width: `${W}px`,
                 height: `${H * 2 + GAP}px`,
                 zIndex: 20,
                 display: 'flex',
                 flexDirection: 'column',
-                gap: `${GAP}px`,
+                justifyContent: 'space-between',
+                alignItems: 'center',
               }}
             >
-              {/* SAFE. On the runner's own base it acts as "Back" — send an
-                  auto-advanced runner back where they started. */}
               <button
-                onClick={() => { if (onDestinationTap) onDestinationTap(baseKey); }}
-                aria-label={isOwn ? `Send runner back to ${baseKey}` : baseKey === 'home' ? 'Safe (score)' : `Safe at ${baseKey}`}
+                onClick={() => { setBinBase(null); if (onDestinationTap) onDestinationTap(baseKey); }}
+                aria-label={isOwn ? `Send runner back to ${baseKey}` : `Safe at ${baseKey}`}
                 style={binBtn}
               >
                 {isOwn ? 'Back' : 'Safe'}
               </button>
               <button
-                onClick={() => onDestinationTap && onDestinationTap('out_at_' + baseKey)}
+                onClick={() => { setBinBase(null); onDestinationTap && onDestinationTap('out_at_' + baseKey); }}
                 aria-label={`Out at ${baseKey}`}
                 style={binBtn}
               >
@@ -898,7 +990,7 @@ const FieldDiamond = ({
               </button>
             </div>
           );
-        })}
+        })()}
         </div>
   );
 };
