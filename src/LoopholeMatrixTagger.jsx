@@ -367,38 +367,7 @@ const FieldDiamond = ({
               cascade with Bunt attempt / Balk / Hit by pitch / Intentional ball.
               Hidden while a runner is armed — the bins overlay owns the surface. */}
 
-          {/* Undo button — lives in the diamond's bottom-right foul territory,
-              right of the 1B line. Always visible (dims with the field when a
-              runner is armed). Replaces the old action-bar Undo. */}
-          {onUndo && (
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); if (canUndo) onUndo(); }}
-              disabled={!canUndo}
-              aria-label="Undo"
-              style={{
-                position: 'absolute',
-                right: '4%',
-                bottom: '4%',
-                background: 'transparent',
-                border: `1px solid ${canUndo ? T.ruleStrong : T.rule}`,
-                borderRadius: 0,
-                padding: '6px 10px',
-                fontFamily: 'inherit',
-                fontSize: '11px',
-                fontWeight: 400,
-                color: canUndo ? T.inkMuted : T.inkPlaceholder,
-                cursor: canUndo ? 'pointer' : 'not-allowed',
-                boxShadow: 'none',
-                zIndex: 5,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-              }}
-            >
-              ↩ Undo
-            </button>
-          )}
+          {/* Undo moved off the field into the action grid (3x2). */}
 
           {/* Batter sphere at home plate — shows jersey number (or slot #).
               Tappable to edit the batter's jersey number. Uses the batter accent
@@ -860,17 +829,41 @@ const FieldDiamond = ({
             );
           })()}
         </div>
-        {/* SAFE/OUT split-circle bins — bright overlay layer ABOVE the dimmed field.
-            One per valid destination, positioned on its base. Original circle size.
-            Top half SAFE (green), bottom half OUT (red); own base = OUT only with
-            SAFE half disabled/grayed. */}
+        {/* SAFE / OUT — two plain rectangles, SAFE above OUT with a gap between
+            them so there is no shared edge to mis-hit. Hairline borders, ink type,
+            paper ground: they read as controls without adding a filled block.
+            Rendered per valid destination and only while a runner is armed; tapping
+            the runner again (or another runner) dismisses without recording. */}
         {armedRunner && binDestinations.map((baseKey) => {
           const pos = binBasePositions[baseKey];
           if (!pos) return null;
           const isOwn = baseKey === binOwnBaseKey;
-          const W = 76;       // bin width (was 64)
-          const HALF = 34;    // each half-circle height
-          const GAP = 7;      // gap between SAFE and OUT
+          const W = 76;       // bin width
+          const H = 34;       // each rectangle's height
+          const GAP = 8;      // gap between SAFE and OUT — no shared edge
+          // Push the pair off its base so the base disc and its number stay readable
+          // underneath. 69px clears the disc radius plus half the pair. The corners
+          // go down into foul ground; 2B goes up into the outfield. Home goes UP into
+          // the empty infield — beside it on either side collides with the corner
+          // pairs at phone width, and below it runs off the box past the catcher.
+          const NUDGE = { '1B': [0, 69], '3B': [0, 69], '2B': [0, -69], 'home': [0, -76] };
+          const [dx, dy] = NUDGE[baseKey] || [0, 0];
+          const binBtn = {
+            width: '100%',
+            height: `${H}px`,
+            borderRadius: 0,
+            background: T.paperRaised,
+            color: T.ink,
+            border: `1px solid ${T.ruleStrong}`,
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            fontSize: '13px',
+            fontWeight: 400,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: 'none',
+          };
           return (
             <div
               key={`binoverlay-${baseKey}`}
@@ -878,67 +871,28 @@ const FieldDiamond = ({
                 position: 'absolute',
                 left: pos.left,
                 top: pos.top,
-                transform: 'translate(-50%, -50%)',
+                transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`,
                 width: `${W}px`,
-                height: `${HALF * 2 + GAP}px`,
+                height: `${H * 2 + GAP}px`,
                 zIndex: 20,
                 display: 'flex',
                 flexDirection: 'column',
                 gap: `${GAP}px`,
               }}
             >
-              {/* SAFE — top half-circle (green). On the runner's own/origin base it
-                  acts as "Back" — send an auto-advanced runner back to where they
-                  started (the safety net for auto-advance). */}
+              {/* SAFE. On the runner's own base it acts as "Back" — send an
+                  auto-advanced runner back where they started. */}
               <button
                 onClick={() => { if (onDestinationTap) onDestinationTap(baseKey); }}
                 aria-label={isOwn ? `Send runner back to ${baseKey}` : baseKey === 'home' ? 'Safe (score)' : `Safe at ${baseKey}`}
-                style={{
-                  width: '100%',
-                  height: `${HALF}px`,
-                  borderTopLeftRadius: `${W}px`,
-                  borderTopRightRadius: `${W}px`,
-                  borderBottomLeftRadius: '6px',
-                  borderBottomRightRadius: '6px',
-                  background: isOwn ? T.ink : T.ink,
-                  color: T.paperRaised,
-                  border: `2px solid ${T.paperRaised}`,
-                  cursor: 'pointer',
-                  fontFamily: 'inherit',
-                  fontSize: '11px',
-                  fontWeight: 400,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: `0 2px 6px ${T.scrim}`,
-                  opacity: 1,
-                }}
+                style={binBtn}
               >
                 {isOwn ? 'Back' : 'Safe'}
               </button>
-              {/* OUT — bottom half-circle (red); always active */}
               <button
                 onClick={() => onDestinationTap && onDestinationTap('out_at_' + baseKey)}
                 aria-label={`Out at ${baseKey}`}
-                style={{
-                  width: '100%',
-                  height: `${HALF}px`,
-                  borderTopLeftRadius: '6px',
-                  borderTopRightRadius: '6px',
-                  borderBottomLeftRadius: `${W}px`,
-                  borderBottomRightRadius: `${W}px`,
-                  background: T.inkMuted,
-                  color: T.paperRaised,
-                  border: `2px solid ${T.paperRaised}`,
-                  cursor: 'pointer',
-                  fontFamily: 'inherit',
-                  fontSize: '11px',
-                  fontWeight: 400,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: `0 2px 6px ${T.scrim}`,
-                }}
+                style={binBtn}
               >
                 Out
               </button>
@@ -1030,10 +984,10 @@ const CascadeScreen = ({
           }}>
             {pendingRunnerAdvance ? (() => {
               const categoryLabels = {
-                stolen_base: 'Stolen Base',
-                caught_stealing: 'Caught Stealing',
+                stolen_base: 'Stolen base',
+                caught_stealing: 'Caught stealing',
                 pickoff: 'Pickoff',
-                battery_error: 'Battery Error',
+                battery_error: 'Battery error',
                 other: 'Other',
               };
               const pitchLabels = {
@@ -1269,10 +1223,10 @@ const CascadeScreen = ({
     // happen on a foul) and adds a "No Pitch" escape for when DI happens with
     // no pitch thrown.
     const categoryLabels = {
-      stolen_base: 'Stolen Base',
-      caught_stealing: 'Caught Stealing',
-      battery_error: 'Battery Error',
-      defensive_indifference: 'Defensive Indifference',
+      stolen_base: 'Stolen base',
+      caught_stealing: 'Caught stealing',
+      battery_error: 'Battery error',
+      defensive_indifference: 'Defensive indifference',
     };
     const cat = pendingRunnerAdvance?.category;
     const baseOpts = [
@@ -1842,11 +1796,11 @@ const ExpandedCellView = ({
   // Runner advance dropdown options.
   // None of these log an implicit pitch — they're between-pitch events.
   const runnerOptions = [
-    { key: 'stolen_base',           label: 'Stolen Base' },
-    { key: 'caught_stealing',       label: 'Caught Stealing' },
+    { key: 'stolen_base',           label: 'Stolen base' },
+    { key: 'caught_stealing',       label: 'Caught stealing' },
     { key: 'pickoff',               label: 'Pickoff' },
-    { key: 'battery_error',         label: 'Battery Error' },
-    { key: 'defensive_indifference', label: 'Defensive Indifference' },
+    { key: 'battery_error',         label: 'Battery error' },
+    { key: 'defensive_indifference', label: 'Defensive indifference' },
     { key: 'other',                 label: 'Other' },
   ];
 
@@ -3637,14 +3591,15 @@ const ExpandedCellView = ({
           }}
         >More</button>
       </div>
-      {/* One row across the bottom of the field: five equal columns divided by
-          hairlines. In play is the fifth and stays the one filled element — it is
-          the tap the scorer reaches for most. */}
+      {/* 3x2 grid. Undo joins the action buttons rather than floating on the field,
+          so the scorer never has to reach into the diamond. Rows are ~44px so two
+          rows plus the gap land close to the old single row's footprint and the
+          diamond keeps its height. In play stays the one filled element; Undo reads
+          muted so it is never mistaken for a tagging action. */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(5, 1fr)',
-        borderTop: `1px solid ${T.rule}`,
-        borderLeft: `1px solid ${T.rule}`,
+        gridTemplateColumns: 'repeat(3, 1fr)',
+        gap: '6px',
         marginBottom: '10px',
         opacity: armedRunner ? 0.4 : 1,
         pointerEvents: armedRunner ? 'none' : 'auto',
@@ -3658,8 +3613,10 @@ const ExpandedCellView = ({
               onClick={() => { flashLocally(`pitch:${b.key}`); handleCellPitchTap(b.key); }}
               style={{
                 ...baseBtnStyle,
+                border: `1px solid ${T.rule}`,
+                minHeight: '44px',
+                padding: '10px 2px',
                 fontSize: '13px',
-                padding: '12px 2px',
                 ...(flashing ? flashStyle : {}),
               }}
             >
@@ -3668,21 +3625,39 @@ const ExpandedCellView = ({
           );
         })}
         {/* Ball in play quick button — skips the PA Result top-level takeover and goes
-            straight to the batted-ball-type screen. Lives on the pitch row because it's
-            a one-tap shortcut for the most common cascade entry. */}
+            straight to the batted-ball-type screen. */}
         <button
           onClick={onOpenBipQuick}
           style={{
             ...baseBtnStyle,
-            fontSize: '13px',
-            padding: '12px 2px',
             border: 'none',
+            minHeight: '44px',
+            padding: '10px 2px',
+            fontSize: '13px',
             background: T.ink,
             color: T.paper,
             fontWeight: 600,
           }}
         >
           In play
+        </button>
+        {/* Undo — muted, and diagonally opposite the pitch buttons so a mis-tap is
+            less likely to land here instead of In play. */}
+        <button
+          onClick={() => { if (canUndo && onUndo) onUndo(); }}
+          disabled={!canUndo}
+          aria-label="Undo"
+          style={{
+            ...baseBtnStyle,
+            border: `1px solid ${canUndo ? T.rule : T.rule}`,
+            minHeight: '44px',
+            padding: '10px 2px',
+            fontSize: '13px',
+            color: canUndo ? T.inkMuted : T.inkPlaceholder,
+            cursor: canUndo ? 'pointer' : 'not-allowed',
+          }}
+        >
+          ↩ Undo
         </button>
       </div>
 
