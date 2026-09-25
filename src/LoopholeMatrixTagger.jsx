@@ -221,7 +221,7 @@ const FieldDiamond = ({
   const armedSrcNum = activeRunner != null
     ? ({ 'batter': 0, '1B': 1, '2B': 2, '3B': 3 })[activeRunner]
     : null;
-  const binDestBaseNum = { '1B': 1, '2B': 2, '3B': 3 };
+  const binDestBaseNum = { '1B': 1, '2B': 2, '3B': 3, 'home': 4 };
   const binOwnBaseKey = activeRunner;
   const binDestinations = armedSrcNum != null
     ? Object.entries(binDestBaseNum)
