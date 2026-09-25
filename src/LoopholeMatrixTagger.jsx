@@ -175,6 +175,8 @@ const FieldDiamond = ({
   onMoundTap,
   onUndo,
   canUndo,
+  onOpenDugout,
+  batterBoxSide,
   batterLabel,
   onBatterTap,
   batterEditing,
@@ -390,17 +392,58 @@ const FieldDiamond = ({
               cascade with Bunt attempt / Balk / Hit by pitch / Intentional ball.
               Hidden while a runner is armed — the bins overlay owns the surface. */}
 
-          {/* Undo moved off the field into the action grid (3x2). */}
+          {/* Dugout buttons — one in each foul-ground wedge, outside the baselines,
+              filling the gap the floating Undo used to sit in. Both open the same
+              lineup sheet in this pass; the geometry already supports splitting them
+              by team later. The wedge is tight at phone width, so the tap target is
+              held at 44px and the label truncates to 3B / 1B rather than shrinking. */}
+          {onOpenDugout && ['3B', '1B'].map((side) => (
+            <button
+              key={`dugout-${side}`}
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onOpenDugout(side); }}
+              aria-label={`Dugout (${side} side)`}
+              style={{
+                position: 'absolute',
+                [side === '3B' ? 'left' : 'right']: '1%',
+                bottom: '6%',
+                width: '68px',
+                minHeight: '44px',
+                padding: '6px 4px',
+                background: 'transparent',
+                border: `1px solid ${T.rule}`,
+                borderRadius: 0,
+                fontFamily: 'inherit',
+                fontSize: '11px',
+                fontWeight: 400,
+                color: T.inkMuted,
+                cursor: 'pointer',
+                lineHeight: 1.25,
+                zIndex: 6,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <span>Dugout</span>
+              <span style={{ color: T.inkPlaceholder }}>{side}</span>
+            </button>
+          ))}
 
           {/* Batter sphere at home plate — shows jersey number (or slot #).
               Tappable to edit the batter's jersey number. Uses the batter accent
               color (orange) to distinguish from runner spheres (blue) and fielders
               (black). When tapped while editing, shows an inline input. */}
+          {/* Batter disc follows handedness: a right-handed hitter stands on the
+              screen-left side of the plate, a lefty on the right. Switch hitters are
+              resolved against the pitcher's throwing hand by the caller. Only the
+              disc moves — the plate and catcher stay put. */}
           {batterLabel && !armedRunner && !('batter' in (runnerPlacements || {})) && (
             batterEditing ? (
               <div style={{
                 position: 'absolute',
-                left: '38%',
+                left: batterBoxSide === 'right' ? '62%' : '38%',
                 top: '86%',
                 transform: 'translate(-50%, -50%)',
                 zIndex: 7,
@@ -442,7 +485,7 @@ const FieldDiamond = ({
                 onClick={(e) => { e.stopPropagation(); onBatterTap && onBatterTap(); }}
                 style={{
                   position: 'absolute',
-                  left: '38%',
+                  left: batterBoxSide === 'right' ? '62%' : '38%',
                   top: '86%',
                   transform: 'translate(-50%, -50%)',
                   width: '50px',
@@ -1636,6 +1679,8 @@ const ExpandedCellView = ({
   baseJerseys,
   onUndo,
   canUndo,
+  onOpenDugout,
+  batterBoxSide,
   pitchDetailOn,
   onTogglePitchDetail,
   sport,
@@ -3216,6 +3261,8 @@ const ExpandedCellView = ({
         onMoundTap={() => { setMorePitchOpen(true); setMoreSubStage(null); }}
         onUndo={onUndo}
         canUndo={canUndo}
+        onOpenDugout={onOpenDugout}
+        batterBoxSide={batterBoxSide}
         batterLabel={jerseyNumber || (batterSlot ? String(batterSlot.slot) : '')}
         onBatterTap={openJerseyEdit}
         batterEditing={jerseyEditing}
@@ -6073,7 +6120,8 @@ function LoopholeMatrixTagger() {
                   </div>
                 )}
                 {rows.map((row, idx) => (
-                  <div key={idx} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                  <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                     <span style={{ fontSize: '11px', color: T.inkFaint, width: '16px', textAlign: 'right' }}>{idx + 1}</span>
                     <input
                       value={row.num || ''}
@@ -6101,11 +6149,42 @@ function LoopholeMatrixTagger() {
                       style={{ background: 'transparent', border: 'none', color: T.inkMuted, fontSize: '16px', cursor: 'pointer', padding: '0 4px' }}
                     >✕</button>
                   </div>
+                  {/* Bats and Throws — one tap each, no keyboard. Bats drives which
+                      box the batter disc renders in; S resolves off the pitcher's
+                      throwing hand. Unset behaves as R and stays editable here. */}
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center', paddingLeft: '22px', marginBottom: '2px' }}>
+                    {[['bats', 'Bats', ['R', 'L', 'S']], ['throws', 'Throws', ['R', 'L']]].map(([field, label, opts]) => (
+                      <div key={field} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <span style={{ fontSize: '11px', color: T.inkMuted }}>{label}</span>
+                        <div style={{ display: 'flex' }}>
+                          {opts.map((o, oi) => {
+                            const on = (row[field] || 'R') === o;
+                            return (
+                              <button
+                                key={o}
+                                onClick={() => setRows(rs => rs.map((r, i) => i === idx ? { ...r, [field]: o } : r))}
+                                aria-label={`${label} ${o} for row ${idx + 1}`}
+                                style={{
+                                  minWidth: '30px', minHeight: '30px', padding: '4px 0',
+                                  background: on ? T.ink : 'transparent',
+                                  color: on ? T.paper : T.inkMuted,
+                                  border: `1px solid ${on ? T.ink : T.ruleStrong}`,
+                                  borderLeftWidth: oi === 0 ? '1px' : '0px',
+                                  fontFamily: 'inherit', fontSize: '11px', cursor: 'pointer',
+                                }}
+                              >{o}</button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  </div>
                 ))}
               </div>
 
               <button
-                onClick={() => setRows(rs => [...rs, { num: '', name: '' }])}
+                onClick={() => setRows(rs => [...rs, { num: '', name: '', bats: 'R', throws: 'R' }])}
                 style={{
                   width: '100%', padding: '10px', background: 'transparent', border: `1px dashed ${T.ruleStrong}`,
                   borderRadius: '8px', color: T.inkSecondary, fontFamily: 'inherit', fontSize: '13px', fontWeight: 500,
@@ -6127,7 +6206,8 @@ function LoopholeMatrixTagger() {
                   </div>
                 )}
                 {pRows.map((row, idx) => (
-                  <div key={idx} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                  <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                     <input
                       value={row.num || ''}
                       onChange={(e) => setPRows(rs => rs.map((r, i) => i === idx ? { ...r, num: e.target.value.replace(/[^0-9]/g, '').slice(0, 3) } : r))}
@@ -6153,6 +6233,32 @@ function LoopholeMatrixTagger() {
                       onClick={() => setPRows(rs => rs.filter((_, i) => i !== idx))}
                       style={{ background: 'transparent', border: 'none', color: T.inkMuted, fontSize: '16px', cursor: 'pointer', padding: '0 4px' }}
                     >✕</button>
+                  </div>
+                  {/* Throws — this is what resolves a switch hitter's box, so it is
+                      the one field the opposing pitcher genuinely needs. */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '2px' }}>
+                    <span style={{ fontSize: '11px', color: T.inkMuted }}>Throws</span>
+                    <div style={{ display: 'flex' }}>
+                      {['R', 'L'].map((o, oi) => {
+                        const on = (row.throws || 'R') === o;
+                        return (
+                          <button
+                            key={o}
+                            onClick={() => setPRows(rs => rs.map((r, i) => i === idx ? { ...r, throws: o } : r))}
+                            aria-label={`Pitcher throws ${o} for row ${idx + 1}`}
+                            style={{
+                              minWidth: '30px', minHeight: '30px', padding: '4px 0',
+                              background: on ? T.ink : 'transparent',
+                              color: on ? T.paper : T.inkMuted,
+                              border: `1px solid ${on ? T.ink : T.ruleStrong}`,
+                              borderLeftWidth: oi === 0 ? '1px' : '0px',
+                              fontFamily: 'inherit', fontSize: '11px', cursor: 'pointer',
+                            }}
+                          >{o}</button>
+                        );
+                      })}
+                    </div>
+                  </div>
                   </div>
                 ))}
               </div>
@@ -6757,6 +6863,25 @@ function LoopholeMatrixTagger() {
             baseJerseys={baseJerseys}
             onUndo={handleUndo}
             canUndo={events.length > 0}
+            onOpenDugout={() => setLineupPanelOpen(true)}
+            batterBoxSide={(() => {
+              // R bats from the screen-left box, L from the right. A switch hitter
+              // takes the box opposite the pitcher's throwing hand: RHP -> hits left
+              // -> renders right. An unset hand, or an opposing pitcher we have not
+              // been given yet, is treated as R rather than leaving the disc unplaced.
+              const bs = getCurrentBatterSlot();
+              const entry = bs ? (rosters[battingSide] || [])[bs.slot - 1] : null;
+              const bats = entry?.bats || 'R';
+              if (bats === 'L') return 'right';
+              if (bats !== 'S') return 'left';
+              const fielding = battingSide === 'away' ? 'home' : 'away';
+              const pNum = getCurrentPitcherNumber(fielding);
+              const pEntry = (pitcherRosters[fielding] || [])
+                .find(r => String(r.num) === String(pNum))
+                || (rosters[fielding] || []).find(r => String(r.num) === String(pNum));
+              const throws = pEntry?.throws || 'R';
+              return throws === 'R' ? 'right' : 'left';
+            })()}
             pitchDetailOn={pitchDetailOn}
             onTogglePitchDetail={() => setPitchDetailOn(v => !v)}
             sport={gameMeta?.sport}
@@ -6795,30 +6920,43 @@ function LoopholeMatrixTagger() {
           }
           return null;
         };
+        if (!lineupPanelOpen) return null;
         return (
-          <div style={{
-            maxWidth: '560px', margin: '8px auto 0',
-            border: `1px solid ${T.rule}`, borderRadius: '6px',
-            background: T.paperRaised, overflow: 'hidden',
+          <div
+            onClick={() => setLineupPanelOpen(false)}
+            style={{
+              position: 'fixed', inset: 0, background: T.scrim, zIndex: 70,
+              display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+            }}
+          >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+            width: '100%', maxWidth: '560px', maxHeight: '86vh', overflowY: 'auto',
+            border: `1px solid ${T.rule}`, borderRadius: '12px 12px 0 0',
+            background: T.paperRaised,
           }}>
-            {/* Header bar — tap to expand/collapse */}
+            {/* Sheet header */}
             <div
-              onClick={() => setLineupPanelOpen(o => !o)}
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '8px 14px', cursor: 'pointer',
+                padding: '14px 14px 10px', borderBottom: `1px solid ${T.rule}`,
               }}
             >
-              <div style={{ fontSize: '11px', color: T.inkMuted, fontWeight: 400 }}>
-                {lineupPanelOpen ? '▾' : '▸'} Lineup — {teamName}
-                {isBatting && <span style={{ color: T.inkMuted }}>  at bat</span>}
+              <div style={{ fontSize: '13px', color: T.ink, fontWeight: 500 }}>
+                Lineup — {teamName}
+                {isBatting && <span style={{ color: T.inkMuted, fontWeight: 400 }}>  at bat</span>}
               </div>
-              <div style={{ fontSize: '11px', color: T.inkFaint }}>
-                {roster.length ? `${roster.length}` : 'tap to add'}
-              </div>
+              <button
+                onClick={() => setLineupPanelOpen(false)}
+                style={{
+                  background: 'transparent', border: 'none', padding: '4px 2px',
+                  fontFamily: 'inherit', fontSize: '13px', color: T.inkMuted, cursor: 'pointer',
+                }}
+              >Close</button>
             </div>
 
-            {lineupPanelOpen && (
+            {true && (
               <div style={{ padding: '0 14px 14px' }}>
                 {/* Team toggle + edit */}
                 <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>
@@ -6890,6 +7028,7 @@ function LoopholeMatrixTagger() {
                 )}
               </div>
             )}
+          </div>
           </div>
         );
       })()}
