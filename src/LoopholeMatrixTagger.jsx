@@ -392,12 +392,16 @@ const FieldDiamond = ({
               cascade with Bunt attempt / Balk / Hit by pitch / Intentional ball.
               Hidden while a runner is armed — the bins overlay owns the surface. */}
 
-          {/* Dugout buttons — one in each foul-ground wedge, outside the baselines,
-              filling the gap the floating Undo used to sit in. Both open the same
-              lineup sheet in this pass; the geometry already supports splitting them
-              by team later. The wedge is tight at phone width, so the tap target is
-              held at 44px and the label truncates to 3B / 1B rather than shrinking. */}
-          {onOpenDugout && ['3B', '1B'].map((side) => (
+          {/* Dugout buttons — triangles filling the foul wedges outside the
+              baselines. Each is clipped to a right triangle whose hypotenuse runs
+              parallel to its foul line and stays inside foul ground, so the wedge is
+              used rather than a small rectangle floating in it. clip-path clips hit
+              testing too, so taps in fair territory fall through to the field, and
+              the wedge sits below the discs so a runner on the corner still wins. */}
+          {onOpenDugout && [
+            { side: '3B', left: '1%',  clip: 'polygon(0% 0%, 0% 100%, 100% 100%)',  align: 'flex-start' },
+            { side: '1B', left: '57%', clip: 'polygon(100% 0%, 100% 100%, 0% 100%)', align: 'flex-end' },
+          ].map(({ side, left, clip, align }) => (
             <button
               key={`dugout-${side}`}
               type="button"
@@ -405,25 +409,28 @@ const FieldDiamond = ({
               aria-label={`Dugout (${side} side)`}
               style={{
                 position: 'absolute',
-                [side === '3B' ? 'left' : 'right']: '1%',
-                bottom: '6%',
-                width: '68px',
-                minHeight: '44px',
-                padding: '6px 4px',
-                background: 'transparent',
-                border: `1px solid ${T.rule}`,
+                left,
+                top: '42%',
+                width: '42%',
+                height: '46%',
+                clipPath: clip,
+                WebkitClipPath: clip,
+                background: T.paperSunk,
+                border: 'none',
                 borderRadius: 0,
+                padding: '0 10px 10px',
                 fontFamily: 'inherit',
                 fontSize: '11px',
                 fontWeight: 400,
                 color: T.inkMuted,
                 cursor: 'pointer',
                 lineHeight: 1.25,
-                zIndex: 6,
+                zIndex: 1,
                 display: 'flex',
                 flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
+                alignItems: align,
+                justifyContent: 'flex-end',
+                textAlign: align === 'flex-end' ? 'right' : 'left',
               }}
             >
               <span>Dugout</span>
@@ -592,6 +599,22 @@ const FieldDiamond = ({
                 {pitcherLabel ? pitcherLabel : 'P#'}
               </button>
             )
+          )}
+
+          {/* The mound chip is tappable but looked exactly like the fielder discs,
+              so nothing said so. Name it. */}
+          {pitcherLabel != null && !armedRunner && (
+            <div style={{
+              position: 'absolute',
+              left: '50%',
+              top: '66%',
+              transform: 'translate(-50%, -50%)',
+              fontSize: '11px',
+              color: T.inkPlaceholder,
+              pointerEvents: 'none',
+              whiteSpace: 'nowrap',
+              zIndex: 6,
+            }}>Pitcher — tap to change</div>
           )}
 
           {(() => {
@@ -6082,6 +6105,21 @@ function LoopholeMatrixTagger() {
           ...prev,
           [team]: typeof updater === 'function' ? updater(prev[team] || []) : updater,
         }));
+        // A spot in the order is fixed once an at-bat has happened in it — that
+        // occurrence is now part of the game's record and cannot be reshuffled.
+        // Spots that have not come up yet are still free to move.
+        const teamPaCount = events.reduce(
+          (n, e) => n + (e.type === 'pa_end' && e.batting === team ? 1 : 0), 0);
+        const lockedThrough = Math.min(teamPaCount, rows.length);
+        const moveRow = (from, to) => {
+          if (to < lockedThrough || to < 0 || to >= rows.length) return;
+          setRows(rs => {
+            const next = rs.slice();
+            const [m] = next.splice(from, 1);
+            next.splice(to, 0, m);
+            return next;
+          });
+        };
         const pRows = pitcherRosters[team] || [];
         const setPRows = (updater) => setPitcherRosters(prev => ({
           ...prev,
@@ -6144,9 +6182,45 @@ function LoopholeMatrixTagger() {
                         background: T.paperRaised,
                       }}
                     />
+                    {(() => {
+                      const locked = idx < lockedThrough;
+                      if (locked) {
+                        return (
+                          <span
+                            title="This spot has already had an at-bat"
+                            style={{ fontSize: '11px', color: T.inkPlaceholder, padding: '0 4px', whiteSpace: 'nowrap' }}
+                          >batted</span>
+                        );
+                      }
+                      return (
+                        <span style={{ display: 'flex' }}>
+                          <button
+                            onClick={() => moveRow(idx, idx - 1)}
+                            disabled={idx - 1 < lockedThrough}
+                            aria-label={`Move row ${idx + 1} up`}
+                            style={{
+                              background: 'transparent', border: 'none', cursor: idx - 1 < lockedThrough ? 'not-allowed' : 'pointer',
+                              color: idx - 1 < lockedThrough ? T.inkPlaceholder : T.inkMuted,
+                              fontSize: '13px', padding: '0 3px', minHeight: '30px',
+                            }}
+                          >▲</button>
+                          <button
+                            onClick={() => moveRow(idx, idx + 1)}
+                            disabled={idx + 1 >= rows.length}
+                            aria-label={`Move row ${idx + 1} down`}
+                            style={{
+                              background: 'transparent', border: 'none', cursor: idx + 1 >= rows.length ? 'not-allowed' : 'pointer',
+                              color: idx + 1 >= rows.length ? T.inkPlaceholder : T.inkMuted,
+                              fontSize: '13px', padding: '0 3px', minHeight: '30px',
+                            }}
+                          >▼</button>
+                        </span>
+                      );
+                    })()}
                     <button
                       onClick={() => setRows(rs => rs.filter((_, i) => i !== idx))}
-                      style={{ background: 'transparent', border: 'none', color: T.inkMuted, fontSize: '16px', cursor: 'pointer', padding: '0 4px' }}
+                      disabled={idx < lockedThrough}
+                      style={{ background: 'transparent', border: 'none', color: idx < lockedThrough ? T.inkPlaceholder : T.inkMuted, fontSize: '16px', cursor: idx < lockedThrough ? 'not-allowed' : 'pointer', padding: '0 4px' }}
                     >✕</button>
                   </div>
                   {/* Bats and Throws — one tap each, no keyboard. Bats drives which
