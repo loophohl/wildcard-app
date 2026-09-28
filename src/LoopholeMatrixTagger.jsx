@@ -392,15 +392,16 @@ const FieldDiamond = ({
               cascade with Bunt attempt / Balk / Hit by pitch / Intentional ball.
               Hidden while a runner is armed — the bins overlay owns the surface. */}
 
-          {/* Dugout buttons — triangles filling the foul wedges outside the
-              baselines. Each is clipped to a right triangle whose hypotenuse runs
-              parallel to its foul line and stays inside foul ground, so the wedge is
-              used rather than a small rectangle floating in it. clip-path clips hit
-              testing too, so taps in fair territory fall through to the field, and
-              the wedge sits below the discs so a runner on the corner still wins. */}
+          {/* Dugout buttons — small right triangles tucked into the foul wedges
+              between the corner bags and home, where a dugout actually sits. The
+              hypotenuse runs at 45deg, matching the baselines. Sized to roughly one
+              action button each, and kept clear of every disc: they start below the
+              corner bags and stop short of the batter's box on both sides, so the
+              batter disc has room whichever box handedness puts it in. clip-path
+              clips hit testing too, and the wedge sits under the discs. */}
           {onOpenDugout && [
-            { side: '3B', left: '1%',  clip: 'polygon(0% 0%, 0% 100%, 100% 100%)',  align: 'flex-start' },
-            { side: '1B', left: '57%', clip: 'polygon(100% 0%, 100% 100%, 0% 100%)', align: 'flex-end' },
+            { side: '3B', left: '0%',    clip: 'polygon(0% 0%, 0% 100%, 100% 100%)',  align: 'flex-start' },
+            { side: '1B', left: '71.8%', clip: 'polygon(100% 0%, 100% 100%, 0% 100%)', align: 'flex-end' },
           ].map(({ side, left, clip, align }) => (
             <button
               key={`dugout-${side}`}
@@ -410,21 +411,21 @@ const FieldDiamond = ({
               style={{
                 position: 'absolute',
                 left,
-                top: '42%',
-                width: '42%',
-                height: '46%',
+                top: '65.9%',
+                width: '28.2%',
+                height: '24.2%',
                 clipPath: clip,
                 WebkitClipPath: clip,
                 background: T.paperSunk,
                 border: 'none',
                 borderRadius: 0,
-                padding: '0 10px 10px',
+                padding: '0 6px 5px',
                 fontFamily: 'inherit',
                 fontSize: '11px',
                 fontWeight: 400,
                 color: T.inkMuted,
                 cursor: 'pointer',
-                lineHeight: 1.25,
+                lineHeight: 1.2,
                 zIndex: 1,
                 display: 'flex',
                 flexDirection: 'column',
