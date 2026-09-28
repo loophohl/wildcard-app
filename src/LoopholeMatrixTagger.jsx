@@ -394,12 +394,11 @@ const FieldDiamond = ({
               Hidden while a runner is armed — the bins overlay owns the surface. */}
 
           {/* Dugout buttons — small right triangles tucked into the foul wedges
-              between the corner bags and home, where a dugout actually sits. The
-              hypotenuse runs at 45deg, matching the baselines. Sized to roughly one
-              action button each, and kept clear of every disc: they start below the
-              corner bags and stop short of the batter's box on both sides, so the
-              batter disc has room whichever box handedness puts it in. clip-path
-              clips hit testing too, and the wedge sits under the discs. */}
+              outside the baselines. The hypotenuse runs at 45deg, matching the
+              lines, and each wedge is placed so the far baseline extended would
+              strike the middle of its hypotenuse: 2B->3B for the third-base wedge,
+              2B->1B for the first-base wedge. Sized to roughly one action button.
+              clip-path clips hit testing too, and the wedge sits under the discs. */}
           {onOpenDugout && [
             { side: '3B', team: 'away', left: '0%',    clip: 'polygon(0% 0%, 0% 100%, 100% 100%)',  align: 'flex-start' },
             { side: '1B', team: 'home', left: '71.8%', clip: 'polygon(100% 0%, 100% 100%, 0% 100%)', align: 'flex-end' },
@@ -412,7 +411,7 @@ const FieldDiamond = ({
               style={{
                 position: 'absolute',
                 left,
-                top: '65.9%',
+                top: '51.3%',
                 width: '28.2%',
                 height: '24.2%',
                 clipPath: clip,
