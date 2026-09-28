@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { supabase, isConfigured as authConfigured, getCachedSession } from './lib/supabase';
 import { Mail } from 'lucide-react';
 
 // Brand asset: Loophohl Diamond Fingerprint mark, sport-coded.
@@ -7867,6 +7868,113 @@ const LAUNCHER_RED = T.ink;
 const LAUNCHER_INK = T.ink;
 const LAUNCHER_MUTED = T.inkMuted;
 
+// Sign in. Email and password only — no verification gate before first use, because
+// a coach standing at a field cannot go check their inbox.
+function WildCardLogin({ onSignedIn }) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [mode, setMode] = useState('signin'); // 'signin' | 'signup'
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!supabase || busy) return;
+    setBusy(true); setMsg(null);
+    try {
+      const fn = mode === 'signup' ? 'signUp' : 'signInWithPassword';
+      const { data, error } = await supabase.auth[fn]({ email: email.trim(), password });
+      if (error) { setMsg(error.message); return; }
+      if (data?.session) onSignedIn(data.session);
+      else setMsg('Account created. Sign in to continue.');
+    } catch {
+      setMsg('Could not reach the server. Check your connection.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const resetPassword = async () => {
+    if (!supabase || !email.trim()) { setMsg('Enter your email first, then tap Forgot.'); return; }
+    setBusy(true); setMsg(null);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
+      setMsg(error ? error.message : 'Reset link sent.');
+    } catch {
+      setMsg('Could not reach the server.');
+    } finally { setBusy(false); }
+  };
+
+  const field = {
+    width: '100%', boxSizing: 'border-box', padding: '13px 12px',
+    fontFamily: 'inherit', fontSize: '15px', color: T.ink,
+    background: T.paperRaised, border: `1px solid ${T.ruleStrong}`,
+    borderRadius: 0, marginBottom: '8px', minHeight: '46px',
+  };
+  const link = {
+    background: 'transparent', border: 'none', padding: '8px 2px',
+    fontFamily: 'inherit', fontSize: '13px', color: T.inkMuted,
+    cursor: 'pointer', textDecoration: 'underline',
+  };
+
+  return (
+    <div style={{
+      minHeight: '100vh', background: T.paper, display: 'flex',
+      flexDirection: 'column', padding: '22px 20px 20px',
+    }}>
+      <div
+        aria-label="WildCard"
+        style={{
+          width: '34px', height: '34px', flexShrink: 0, background: '#B84A2C',
+          WebkitMaskImage: `url(${FINGERPRINT_RED})`, maskImage: `url(${FINGERPRINT_RED})`,
+          WebkitMaskSize: 'contain', maskSize: 'contain',
+          WebkitMaskRepeat: 'no-repeat', maskRepeat: 'no-repeat',
+        }}
+      />
+      <form onSubmit={submit} style={{ flex: 1, maxWidth: '380px', width: '100%', margin: '34px auto 0' }}>
+        <div style={{ fontSize: '22px', fontWeight: 400, color: T.ink, marginBottom: '18px' }}>
+          {mode === 'signup' ? 'Create an account' : 'Sign in'}
+        </div>
+        <input
+          type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+          placeholder="Email" autoComplete="email" inputMode="email" style={field}
+        />
+        <input
+          type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+          placeholder="Password"
+          autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+          style={field}
+        />
+        {msg && (
+          <div style={{ fontSize: '11px', color: T.inkSecondary, margin: '2px 0 10px' }}>{msg}</div>
+        )}
+        <button
+          type="submit" disabled={busy || !email.trim() || !password}
+          style={{
+            width: '100%', padding: '14px', minHeight: '48px',
+            background: (busy || !email.trim() || !password) ? T.rule : T.ink,
+            color: (busy || !email.trim() || !password) ? T.inkPlaceholder : T.paper,
+            border: 'none', borderRadius: 0, fontFamily: 'inherit',
+            fontSize: '15px', fontWeight: 600,
+            cursor: (busy || !email.trim() || !password) ? 'not-allowed' : 'pointer',
+            marginTop: '4px',
+          }}
+        >{busy ? 'Working…' : (mode === 'signup' ? 'Create account' : 'Sign in')}</button>
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px' }}>
+          <button type="button" onClick={resetPassword} style={link}>Forgot?</button>
+          <button
+            type="button"
+            onClick={() => { setMode(m => (m === 'signup' ? 'signin' : 'signup')); setMsg(null); }}
+            style={link}
+          >{mode === 'signup' ? 'Sign in instead' : 'Create an account'}</button>
+        </div>
+      </form>
+      <div style={{ textAlign: 'center', fontSize: '11px', color: T.inkFaint }}>LoopHohl</div>
+    </div>
+  );
+}
+
 // Splash. Full-bleed paper, the fingerprint alone, no wordmark. Holds ~2.5s and
 // advances itself; a tap during the hold advances immediately. No spinner, no skip
 // control — it is a held beat, not a loading state.
@@ -7909,6 +8017,17 @@ function WildCardLauncher() {
   const [splashDone, setSplashDone] = useState(false);
   const [opened, setOpened] = useState(false);
   const [resumeInfo, setResumeInfo] = useState(null);
+  // Auth gate. 'checking' only until the cached session is read — never a network
+  // round trip, so a dugout with no signal falls straight through.
+  const [session, setSession] = useState(undefined);
+
+  useEffect(() => {
+    if (!authConfigured) { setSession(null); return; }
+    let cancelled = false;
+    getCachedSession().then(sess => { if (!cancelled) setSession(sess); });
+    const { data: sub } = supabase.auth.onAuthStateChange((_evt, sess) => setSession(sess));
+    return () => { cancelled = true; sub?.subscription?.unsubscribe?.(); };
+  }, []);
 
   // Probe localStorage for an in-progress game so the card can offer "Resume"
   // instead of "Open" when there's something to come back to. Keys here mirror
@@ -7932,8 +8051,15 @@ function WildCardLauncher() {
     }
   }, []);
 
-  if (!splashDone) {
+  if (!splashDone || session === undefined) {
     return <WildCardSplash onDone={() => setSplashDone(true)} />;
+  }
+
+  // Sign in only when the project is configured and there is no cached session.
+  // If Supabase is not wired up, or we are offline with a session already cached,
+  // the gate is skipped rather than dead-ending the scorer.
+  if (authConfigured && !session) {
+    return <WildCardLogin onSignedIn={setSession} />;
   }
 
   if (opened) {
