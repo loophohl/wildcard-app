@@ -4064,11 +4064,17 @@ function LoopholeMatrixTagger() {
   const [rosterEditor, setRosterEditor] = useState(null); // { team } | null
   const [lineupPanelOpen, setLineupPanelOpen] = useState(false);
   const [playerCard, setPlayerCard] = useState(null); // { side, num, role } | null
+  // Pre-game format popup. null once dismissed; 1 = format, 2 = Wildcard options.
+  const [formatStep, setFormatStep] = useState(null);
+  const [formatDraft, setFormatDraft] = useState({ format: 'Wildcard', startCount: '0-0', runLimit: null });
   const [lineupTeamView, setLineupTeamView] = useState(null); // null = follow batting side
   // Pitch Detail mode. OFF by default: the one-tap pitch is the app's fastest and most
   // frequent action, and routing every pitch through two extra screens would slow the
   // core loop badly. When on, each pitch asks for type then velocity — both skippable.
-  const [pitchDetailOn, setPitchDetailOn] = useState(false);
+  // On by default now that the pitch sequence is readable on the player card.
+  // The scorer can still switch it off, and that choice sticks — the stored value
+  // is tri-state ('1' / '0' / absent) so an explicit off is not mistaken for unset.
+  const [pitchDetailOn, setPitchDetailOn] = useState(true);
   // Last velocity entered per pitching side, so the scroller opens near the previous
   // reading instead of the middle of the range. Most pitches land within a few mph of
   // the last one, which turns a long scroll into a nudge.
@@ -4238,7 +4244,7 @@ function LoopholeMatrixTagger() {
         } catch {}
       }
       const rawPitchDetail = storage.get(PITCH_DETAIL_KEY);
-      if (!cancelled && rawPitchDetail === '1') setPitchDetailOn(true);
+      if (!cancelled && rawPitchDetail != null) setPitchDetailOn(rawPitchDetail === '1');
     } catch {
       // No saved game or unparseable — start fresh
     } finally {
@@ -4330,8 +4336,7 @@ function LoopholeMatrixTagger() {
   // the mode doesn't have to be re-enabled every time.
   useEffect(() => {
     if (!isLoaded) return;
-    if (pitchDetailOn) storage.set(PITCH_DETAIL_KEY, '1');
-    else storage.delete(PITCH_DETAIL_KEY);
+    storage.set(PITCH_DETAIL_KEY, pitchDetailOn ? '1' : '0');
   }, [pitchDetailOn, isLoaded]);
 
   // Persist pitcher changes so per-pitcher counts survive refresh
@@ -4450,9 +4455,12 @@ function LoopholeMatrixTagger() {
         break;
       }
     }
-    // Walk forward from there, accumulating count in natural order.
-    let balls = 0;
-    let strikes = 0;
+    // Walk forward from there, accumulating count in natural order. A 1-1 game
+    // starts every plate appearance at one and one; because the count is derived
+    // rather than stored, undoing back across a PA boundary restores 1-1 too.
+    const seeded = gameMeta?.startCount === '1-1';
+    let balls = seeded ? 1 : 0;
+    let strikes = seeded ? 1 : 0;
     for (let i = startIdx; i < list.length; i++) {
       const e = list[i];
       if (e.type !== 'pitch' && e.type) continue; // skip non-pitch events (between_pitch, pitcher_change)
@@ -6129,7 +6137,12 @@ function LoopholeMatrixTagger() {
       homeLineupSize: setupForm.homeLineupSize,
       awayLineupSize: setupForm.awayLineupSize,
       startedAt: new Date().toISOString(),
+      // Filled in when the pre-game popup is dismissed.
+      startCount: '0-0',
+      runLimit: null,
     });
+    setFormatDraft({ format: setupForm.format || 'Wildcard', startCount: '0-0', runLimit: null });
+    setFormatStep(1);
     // v1.5 — Auto-land in the starting cell. Saves the scorer one tap; the matrix
     // peek is still available via "Return to Matrix" from the cell view.
     //   Wildcard format → 'loaded', 0 outs (the format's whole point — bases always loaded)
@@ -7039,6 +7052,123 @@ function LoopholeMatrixTagger() {
         );
       })()}
 
+      {/* Pre-game format popup. Fires once after Start game and before any pitch
+          can be tagged. The field sits behind a scrim rather than being replaced, so
+          the scorer can see the tagger is loaded and ready. The scrim also blocks
+          every pitch button, which is what keeps a pitch from landing early. */}
+      {formatStep && (
+        <div style={{
+          position: 'fixed', inset: 0, background: T.scrim, zIndex: 90,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px',
+        }}>
+          <div style={{
+            background: T.paperRaised, borderRadius: '12px', padding: '20px',
+            maxWidth: '340px', width: '100%', border: `1px solid ${T.rule}`,
+          }}>
+            {formatStep === 1 ? (
+              <>
+                <div style={{ fontSize: '15px', fontWeight: 500, color: T.ink, marginBottom: '2px' }}>Format</div>
+                <div style={{ fontSize: '11px', color: T.inkMuted, marginBottom: '14px' }}>
+                  How is this game being played?
+                </div>
+                {[
+                  { key: 'Wildcard', note: 'Bases loaded to start every inning' },
+                  { key: 'Traditional', note: 'Standard rules' },
+                ].map(({ key, note }) => (
+                  <button
+                    key={key}
+                    onClick={() => {
+                      if (key === 'Traditional') {
+                        setGameMeta(m => ({ ...m, format: 'Traditional', startCount: '0-0', runLimit: null }));
+                        setExpandedCell({ stateKey: 'empty', outs: 0 });
+                        setFormatStep(null);
+                      } else {
+                        setFormatDraft(d => ({ ...d, format: 'Wildcard' }));
+                        setFormatStep(2);
+                      }
+                    }}
+                    style={{
+                      width: '100%', textAlign: 'left', background: 'transparent',
+                      border: 'none', borderTop: `1px solid ${T.rule}`, borderRadius: 0,
+                      padding: '14px 4px', minHeight: '52px', cursor: 'pointer',
+                      fontFamily: 'inherit', fontSize: '15px', color: T.ink,
+                    }}
+                  >
+                    {key}
+                    <div style={{ fontSize: '11px', color: T.inkMuted, marginTop: '2px' }}>{note}</div>
+                  </button>
+                ))}
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: '15px', fontWeight: 500, color: T.ink, marginBottom: '2px' }}>Wildcard options</div>
+                <div style={{ fontSize: '11px', color: T.inkMuted, marginBottom: '14px' }}>
+                  Either, both, or neither.
+                </div>
+                {[
+                  { id: 'startCount', label: '1–1 count', note: 'Every plate appearance starts 1–1',
+                    on: formatDraft.startCount === '1-1',
+                    toggle: () => setFormatDraft(d => ({ ...d, startCount: d.startCount === '1-1' ? '0-0' : '1-1' })) },
+                  { id: 'runLimit', label: '7-run inning limit', note: 'Half-inning ends at 7 runs',
+                    on: formatDraft.runLimit === 7,
+                    toggle: () => setFormatDraft(d => ({ ...d, runLimit: d.runLimit === 7 ? null : 7 })) },
+                ].map(({ id, label, note, on, toggle }) => (
+                  <button
+                    key={id}
+                    onClick={toggle}
+                    aria-label={`${label} ${on ? 'on' : 'off'}`}
+                    style={{
+                      width: '100%', textAlign: 'left', background: 'transparent',
+                      border: 'none', borderTop: `1px solid ${T.rule}`, borderRadius: 0,
+                      padding: '14px 4px', minHeight: '52px', cursor: 'pointer',
+                      fontFamily: 'inherit', fontSize: '15px', color: T.ink,
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px',
+                    }}
+                  >
+                    <span>
+                      {label}
+                      <div style={{ fontSize: '11px', color: T.inkMuted, marginTop: '2px' }}>{note}</div>
+                    </span>
+                    <span style={{
+                      flexShrink: 0, minWidth: '38px', textAlign: 'center',
+                      fontSize: '11px', padding: '4px 8px',
+                      background: on ? T.ink : 'transparent',
+                      color: on ? T.paper : T.inkMuted,
+                      border: `1px solid ${on ? T.ink : T.ruleStrong}`,
+                    }}>{on ? 'On' : 'Off'}</span>
+                  </button>
+                ))}
+                <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+                  <button
+                    onClick={() => setFormatStep(1)}
+                    style={{
+                      flex: '0 0 auto', padding: '13px 14px', background: 'transparent',
+                      border: `1px solid ${T.rule}`, borderRadius: 0, cursor: 'pointer',
+                      fontFamily: 'inherit', fontSize: '13px', color: T.inkMuted,
+                    }}
+                  >Back</button>
+                  <button
+                    onClick={() => {
+                      setGameMeta(m => ({
+                        ...m, format: 'Wildcard',
+                        startCount: formatDraft.startCount,
+                        runLimit: formatDraft.runLimit,
+                      }));
+                      setFormatStep(null);
+                    }}
+                    style={{
+                      flex: 1, padding: '13px 8px', background: T.ink, color: T.paper,
+                      border: 'none', borderRadius: 0, cursor: 'pointer',
+                      fontFamily: 'inherit', fontSize: '15px', fontWeight: 600,
+                    }}
+                  >Start game</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Player game card — opened from a player rectangle. A hitter gets their PA
           chart: one block per plate appearance, each a two-column table of the pitch
           sequence (type, then what the pitch did) with the PA's result underneath in
@@ -7737,7 +7867,46 @@ const LAUNCHER_RED = T.ink;
 const LAUNCHER_INK = T.ink;
 const LAUNCHER_MUTED = T.inkMuted;
 
+// Splash. Full-bleed paper, the fingerprint alone, no wordmark. Holds ~2.5s and
+// advances itself; a tap during the hold advances immediately. No spinner, no skip
+// control — it is a held beat, not a loading state.
+//
+// The mark is the existing brand asset recoloured to the brand red by using the PNG
+// as a mask over a solid fill, rather than redrawing it.
+function WildCardSplash({ onDone }) {
+  useEffect(() => {
+    const t = setTimeout(onDone, 2500);
+    return () => clearTimeout(t);
+  }, [onDone]);
+  return (
+    <div
+      onClick={onDone}
+      style={{
+        position: 'fixed', inset: 0, background: T.paper,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        cursor: 'pointer',
+      }}
+    >
+      <div
+        aria-label="WildCard"
+        style={{
+          width: '160px', height: '160px',
+          background: '#B84A2C',
+          WebkitMaskImage: `url(${FINGERPRINT_RED})`,
+          maskImage: `url(${FINGERPRINT_RED})`,
+          WebkitMaskSize: 'contain', maskSize: 'contain',
+          WebkitMaskRepeat: 'no-repeat', maskRepeat: 'no-repeat',
+          WebkitMaskPosition: 'center', maskPosition: 'center',
+        }}
+      />
+    </div>
+  );
+}
+
 function WildCardLauncher() {
+  // The app must not open straight into the tagger. Until login and the roster
+  // page land, the splash hands off to the existing entry card, which is the gate.
+  const [splashDone, setSplashDone] = useState(false);
   const [opened, setOpened] = useState(false);
   const [resumeInfo, setResumeInfo] = useState(null);
 
@@ -7762,6 +7931,10 @@ function WildCardLauncher() {
       // Stale or malformed storage — no resume offer, no error surfaced.
     }
   }, []);
+
+  if (!splashDone) {
+    return <WildCardSplash onDone={() => setSplashDone(true)} />;
+  }
 
   if (opened) {
     return <LoopholeMatrixTagger />;
