@@ -177,6 +177,7 @@ const FieldDiamond = ({
   canUndo,
   onOpenDugout,
   batterBoxSide,
+  dugoutTeams,
   batterLabel,
   onBatterTap,
   batterEditing,
@@ -400,14 +401,14 @@ const FieldDiamond = ({
               batter disc has room whichever box handedness puts it in. clip-path
               clips hit testing too, and the wedge sits under the discs. */}
           {onOpenDugout && [
-            { side: '3B', left: '0%',    clip: 'polygon(0% 0%, 0% 100%, 100% 100%)',  align: 'flex-start' },
-            { side: '1B', left: '71.8%', clip: 'polygon(100% 0%, 100% 100%, 0% 100%)', align: 'flex-end' },
-          ].map(({ side, left, clip, align }) => (
+            { side: '3B', team: 'away', left: '0%',    clip: 'polygon(0% 0%, 0% 100%, 100% 100%)',  align: 'flex-start' },
+            { side: '1B', team: 'home', left: '71.8%', clip: 'polygon(100% 0%, 100% 100%, 0% 100%)', align: 'flex-end' },
+          ].map(({ side, team, left, clip, align }) => (
             <button
               key={`dugout-${side}`}
               type="button"
               onClick={(e) => { e.stopPropagation(); onOpenDugout(side); }}
-              aria-label={`Dugout (${side} side)`}
+              aria-label={`${(dugoutTeams && dugoutTeams[team]) || side} dugout`}
               style={{
                 position: 'absolute',
                 left,
@@ -416,7 +417,7 @@ const FieldDiamond = ({
                 height: '24.2%',
                 clipPath: clip,
                 WebkitClipPath: clip,
-                background: T.paperSunk,
+                background: T.rule,
                 border: 'none',
                 borderRadius: 0,
                 padding: '0 6px 5px',
@@ -434,8 +435,10 @@ const FieldDiamond = ({
                 textAlign: align === 'flex-end' ? 'right' : 'left',
               }}
             >
-              <span>Dugout</span>
-              <span style={{ color: T.inkPlaceholder }}>{side}</span>
+              <span style={{ color: T.inkSecondary }}>
+                {(dugoutTeams && dugoutTeams[team]) || side}
+              </span>
+              <span style={{ color: T.inkMuted }}>Dugout</span>
             </button>
           ))}
 
@@ -1705,6 +1708,7 @@ const ExpandedCellView = ({
   canUndo,
   onOpenDugout,
   batterBoxSide,
+  dugoutTeams,
   pitchDetailOn,
   onTogglePitchDetail,
   sport,
@@ -3287,6 +3291,7 @@ const ExpandedCellView = ({
         canUndo={canUndo}
         onOpenDugout={onOpenDugout}
         batterBoxSide={batterBoxSide}
+        dugoutTeams={dugoutTeams}
         batterLabel={jerseyNumber || (batterSlot ? String(batterSlot.slot) : '')}
         onBatterTap={openJerseyEdit}
         batterEditing={jerseyEditing}
@@ -6938,7 +6943,16 @@ function LoopholeMatrixTagger() {
             baseJerseys={baseJerseys}
             onUndo={handleUndo}
             canUndo={events.length > 0}
-            onOpenDugout={() => setLineupPanelOpen(true)}
+            onOpenDugout={(side) => {
+              // Each wedge opens its own team's dugout. Visitors take the 3B side,
+              // home the 1B side, the way the benches actually sit.
+              setLineupTeamView(side === '1B' ? 'home' : 'away');
+              setLineupPanelOpen(true);
+            }}
+            dugoutTeams={{
+              away: gameMeta?.awayTeam || 'Away',
+              home: gameMeta?.homeTeam || 'Home',
+            }}
             batterBoxSide={(() => {
               // R bats from the screen-left box, L from the right. A switch hitter
               // takes the box opposite the pitcher's throwing hand: RHP -> hits left
