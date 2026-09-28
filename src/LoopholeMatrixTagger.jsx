@@ -4063,6 +4063,7 @@ function LoopholeMatrixTagger() {
   const [pitcherRosters, setPitcherRosters] = useState({ home: [], away: [] });
   const [rosterEditor, setRosterEditor] = useState(null); // { team } | null
   const [lineupPanelOpen, setLineupPanelOpen] = useState(false);
+  const [playerCard, setPlayerCard] = useState(null); // { side, num, role } | null
   const [lineupTeamView, setLineupTeamView] = useState(null); // null = follow batting side
   // Pitch Detail mode. OFF by default: the one-tap pitch is the app's fastest and most
   // frequent action, and routing every pitch through two extra screens would slow the
@@ -4730,6 +4731,99 @@ function LoopholeMatrixTagger() {
   // A hitter's line for the game (hits-for-at-bats), keyed by jersey number. Walks,
   // HBP, and sacrifices are not at-bats, so they don't count against the line. Used to
   // show "(1-3)" next to a name. Returns null if the number is unknown.
+  // ── Per-player game log ────────────────────────────────────────────────
+  // Pitch events do not carry a batterNumber yet (that ships separately), so a
+  // player's plate appearances are recovered positionally: walk the side's events
+  // in order, close a PA on each pa_end, and map the PA's index through the
+  // lineup the same way the current-batter slot is worked out.
+  const FIELDER_NUM = { P: 1, C: 2, '1B': 3, '2B': 4, '3B': 5, SS: 6, LF: 7, CF: 8, RF: 9 };
+
+  const getLineupSizeFor = (side) => {
+    const roster = rosters[side] || [];
+    if (roster.length) return roster.length;
+    const str = side === 'home'
+      ? (gameMeta?.homeLineupSize || gameMeta?.lineupSize)
+      : (gameMeta?.awayLineupSize || gameMeta?.lineupSize);
+    return parseInt(str, 10) || 9;
+  };
+
+  // "GB 6-3", "2B LF", "F8", "K" — the shorthand a coach reads at a glance.
+  const describePaEnd = (e) => {
+    if (!e) return { short: 'in progress', detail: '' };
+    const seq = (e.fielderSequence || []).map(c => FIELDER_NUM[c] || c);
+    const seqStr = seq.join('-');
+    const firstCode = (e.fielderSequence || [])[0] || '';
+    const bb = { ground_ball: 'GB', fly_ball: 'F', pop_fly: 'P', line_drive: 'LD', bunt: 'BU' }[e.battedBall] || '';
+    const cat = e.category;
+    if (cat === 'hit') {
+      const h = { single: '1B', double: '2B', triple: '3B', home_run: 'HR', inside_the_park_hr: 'HR' }[e.extras?.hitType || e.hitType] || 'H';
+      return { short: firstCode ? `${h} ${firstCode}` : h, detail: bb ? `${bb}${seqStr ? ' ' + seqStr : ''}` : '' };
+    }
+    if (cat === 'walk') return { short: 'BB', detail: '' };
+    if (cat === 'intentional_walk') return { short: 'IBB', detail: '' };
+    if (cat === 'hit_by_pitch') return { short: 'HBP', detail: '' };
+    if (cat === 'strikeout_called') return { short: '\u04c0', detail: 'called' };
+    if (cat === 'strikeout_swinging') return { short: 'K', detail: 'swinging' };
+    if (cat === 'reached_on_error') return { short: seqStr ? `E${seq[0]}` : 'E', detail: bb };
+    if (cat === 'fielders_choice') return { short: seqStr ? `FC ${seqStr}` : 'FC', detail: bb };
+    if (cat === 'dropped_third_strike') return { short: 'K-DTS', detail: '' };
+    // outs on batted balls
+    if (bb && seqStr) return { short: `${bb} ${seqStr}`, detail: '' };
+    if (bb) return { short: bb, detail: '' };
+    return { short: (cat || 'out').replace(/_/g, ' '), detail: '' };
+  };
+
+  const PITCH_RESULT_LABEL = {
+    ball: 'Ball',
+    called_strike: 'Called strike',
+    swing_miss: 'Swing & miss',
+    foul: 'Foul',
+    in_play: 'In play',
+    intentional_ball: 'Intentional ball',
+    bunt_foul: 'Bunt foul',
+    bunt_strike: 'Bunt strike',
+  };
+
+  // Every plate appearance this jersey has taken, each with its pitch sequence.
+  const getPlayerPAs = (side, num) => {
+    if (num == null || num === '') return [];
+    const roster = rosters[side] || [];
+    const slotOf = roster.findIndex(r => String(r.num) === String(num)) + 1;
+    if (!slotOf) return [];
+    const lineupSize = getLineupSizeFor(side);
+    const out = [];
+    let cur = [];
+    let paIdx = 0;
+    for (const e of events) {
+      if (e.batting !== side) continue;
+      if (e.type === 'pitch') { cur.push(e); continue; }
+      if (e.type === 'pa_end') {
+        out.push({ slot: (paIdx % lineupSize) + 1, pitches: cur, end: e });
+        cur = []; paIdx++;
+      }
+    }
+    if (cur.length) out.push({ slot: (paIdx % lineupSize) + 1, pitches: cur, end: null });
+    return out.filter(pa => pa.slot === slotOf);
+  };
+
+  // Pitches thrown by a jersey, split by the pitcher_change log so a reliever's
+  // count starts at zero rather than inheriting the starter's.
+  const getPitcherStats = (side, num) => {
+    if (num == null || num === '') return { pitches: 0, strikes: 0, balls: 0 };
+    const target = String(num);
+    let active = null, pitches = 0, strikes = 0, balls = 0;
+    for (const e of events) {
+      if (e.type === 'pitcher_change' && e.side === side) { active = e.jerseyNumber ? String(e.jerseyNumber) : null; continue; }
+      if (e.type !== 'pitch') continue;
+      if (e.batting === side) continue;           // this side is pitching when the OTHER side bats
+      if (active !== target) continue;
+      pitches++;
+      if (e.pitch === 'ball' || e.pitch === 'intentional_ball') balls++;
+      else if (e.pitch !== 'in_play') strikes++;
+    }
+    return { pitches, strikes, balls };
+  };
+
   const getHitterLine = (side, num) => {
     if (num == null || num === '') return null;
     const s = String(num);
@@ -6837,6 +6931,7 @@ function LoopholeMatrixTagger() {
         };
 
         return (
+          <>
           <div style={{
             maxWidth: '560px',
             margin: '0 auto 4px',
@@ -6851,7 +6946,7 @@ function LoopholeMatrixTagger() {
               >
                 <div style={{ minWidth: 0 }}>
                   <div style={teamNameStyle}>{gameMeta.awayTeam}</div>
-                  {renderTeamSubline('away', awayPitcherNumber, awayJersey, currentAwayPitcher, awayTeamPitches, 'left')}
+
                 </div>
                 <span style={scoreNumStyle}>{scores.away}</span>
               </div>
@@ -6889,8 +6984,175 @@ function LoopholeMatrixTagger() {
                 <span style={scoreNumStyle}>{scores.home}</span>
                 <div style={{ minWidth: 0, textAlign: 'right' }}>
                   <div style={teamNameStyle}>{gameMeta.homeTeam}</div>
-                  {renderTeamSubline('home', homePitcherNumber, homeJersey, currentHomePitcher, homeTeamPitches, 'right')}
+
                 </div>
+              </div>
+            </div>
+          </div>
+          {/* Player rectangles — one under each side of the scoreboard. The side on
+              defence shows its pitcher, the side at bat shows its current hitter.
+              Name and number only; tapping opens that player's game card. */}
+          <div style={{
+            maxWidth: '560px', margin: '0 auto 4px', display: 'flex',
+            borderBottom: `1px solid ${T.rule}`,
+          }}>
+            {['away', 'home'].map((side, i) => {
+              const onDefence = side !== battingSide;
+              let num = null, name = '', role = '';
+              if (onDefence) {
+                role = 'pitcher';
+                num = getCurrentPitcherNumber(side);
+                const pr = (pitcherRosters[side] || []).find(r => String(r.num) === String(num))
+                        || (rosters[side] || []).find(r => String(r.num) === String(num));
+                name = pr ? formatInitialLast(pr.name) : '';
+              } else {
+                role = 'hitter';
+                const bs = getCurrentBatterSlot();
+                num = bs ? getJerseyNumber(side, bs.slot) : null;
+                const entry = bs ? (rosters[side] || [])[bs.slot - 1] : null;
+                name = entry ? formatInitialLast(entry.name) : '';
+              }
+              const label = [name, num != null && num !== '' ? `#${num}` : null].filter(Boolean).join('  ');
+              return (
+                <button
+                  key={side}
+                  onClick={() => { if (num != null && num !== '') setPlayerCard({ side, num, role }); }}
+                  aria-label={`${side} ${role} card`}
+                  style={{
+                    flex: 1, minWidth: 0, textAlign: i === 0 ? 'left' : 'right',
+                    background: 'transparent', border: 'none',
+                    borderRight: i === 0 ? `1px solid ${T.rule}` : 'none',
+                    borderRadius: 0, padding: '7px 12px', minHeight: '34px',
+                    fontFamily: 'inherit', fontSize: '11px', fontWeight: 400,
+                    color: label ? T.ink : T.inkPlaceholder,
+                    cursor: (num != null && num !== '') ? 'pointer' : 'default',
+                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                  }}
+                >
+                  <span style={{ color: T.inkMuted }}>{onDefence ? 'P ' : 'AB '}</span>
+                  {label || (onDefence ? 'Tap the mound to set' : 'No lineup')}
+                </button>
+              );
+            })}
+          </div>
+          </>
+        );
+      })()}
+
+      {/* Player game card — opened from a player rectangle. A hitter gets their PA
+          chart: one block per plate appearance, each a two-column table of the pitch
+          sequence (type, then what the pitch did) with the PA's result underneath in
+          scorer shorthand. A pitcher gets their count for the game. */}
+      {playerCard && (() => {
+        const { side, num, role } = playerCard;
+        const roster = rosters[side] || [];
+        const pRoster = pitcherRosters[side] || [];
+        const entry = roster.find(r => String(r.num) === String(num))
+                   || pRoster.find(r => String(r.num) === String(num));
+        const teamName = side === 'home' ? (gameMeta?.homeTeam || 'Home') : (gameMeta?.awayTeam || 'Away');
+        const pas = getPlayerPAs(side, num);
+        const ps = getPitcherStats(side, num);
+        const hand = entry
+          ? [entry.bats ? `bats ${entry.bats}` : null, entry.throws ? `throws ${entry.throws}` : null].filter(Boolean).join(', ')
+          : '';
+        const cell = { padding: '5px 8px', fontSize: '11px', textAlign: 'left', whiteSpace: 'nowrap' };
+        return (
+          <div
+            onClick={() => setPlayerCard(null)}
+            style={{
+              position: 'fixed', inset: 0, background: T.scrim, zIndex: 80,
+              display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: '100%', maxWidth: '560px', maxHeight: '86vh', overflowY: 'auto',
+                background: T.paperRaised, borderRadius: '12px 12px 0 0',
+                border: `1px solid ${T.rule}`,
+              }}
+            >
+              <div style={{
+                display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
+                padding: '14px 14px 10px', borderBottom: `1px solid ${T.rule}`,
+                position: 'sticky', top: 0, background: T.paperRaised,
+              }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: '15px', fontWeight: 500, color: T.ink }}>
+                    {entry?.name ? entry.name : `#${num}`}
+                    {entry?.name ? <span style={{ color: T.inkMuted, fontWeight: 400 }}>{`  #${num}`}</span> : null}
+                  </div>
+                  <div style={{ fontSize: '11px', color: T.inkMuted, marginTop: '2px' }}>
+                    {teamName}{hand ? `  ${hand}` : ''}
+                  </div>
+                </div>
+                <button
+                  onClick={() => setPlayerCard(null)}
+                  style={{ background: 'transparent', border: 'none', padding: '4px 2px',
+                           fontFamily: 'inherit', fontSize: '13px', color: T.inkMuted, cursor: 'pointer' }}
+                >Close</button>
+              </div>
+
+              <div style={{ padding: '12px 14px 20px' }}>
+                {/* Pitching line — shown for the pitcher, and for any hitter who has
+                    also thrown this game. */}
+                {(role === 'pitcher' || ps.pitches > 0) && (
+                  <div style={{ marginBottom: pas.length ? '18px' : '0' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 500, color: T.ink, marginBottom: '6px' }}>Pitching</div>
+                    <div style={{ display: 'flex', gap: '18px', fontSize: '11px', color: T.inkSecondary }}>
+                      <span><span style={{ color: T.inkMuted }}>Pitches </span>{ps.pitches}</span>
+                      <span><span style={{ color: T.inkMuted }}>Strikes </span>{ps.strikes}</span>
+                      <span><span style={{ color: T.inkMuted }}>Balls </span>{ps.balls}</span>
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ fontSize: '13px', fontWeight: 500, color: T.ink, marginBottom: '8px' }}>
+                  Plate appearances
+                </div>
+                {pas.length === 0 ? (
+                  <div style={{ fontSize: '11px', color: T.inkFaint, fontStyle: 'italic' }}>
+                    Nothing yet this game.
+                  </div>
+                ) : pas.map((pa, i) => {
+                  const d = describePaEnd(pa.end);
+                  return (
+                    <div key={i} style={{ marginBottom: '14px', borderTop: `1px solid ${T.rule}`, paddingTop: '8px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '4px' }}>
+                        <span style={{ fontSize: '11px', color: T.inkMuted }}>PA {i + 1}</span>
+                        <span style={{ fontSize: '13px', fontWeight: 500, color: T.ink }}>
+                          {d.short}
+                          {d.detail ? <span style={{ color: T.inkMuted, fontWeight: 400, fontSize: '11px' }}>{`  ${d.detail}`}</span> : null}
+                        </span>
+                      </div>
+                      {pa.pitches.length === 0 ? (
+                        <div style={{ fontSize: '11px', color: T.inkFaint, fontStyle: 'italic' }}>No pitches logged</div>
+                      ) : (
+                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                          <thead>
+                            <tr>
+                              <th style={{ ...cell, color: T.inkMuted, fontWeight: 400, width: '44%' }}>Pitch</th>
+                              <th style={{ ...cell, color: T.inkMuted, fontWeight: 400 }}>Result</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {pa.pitches.map((pe, j) => (
+                              <tr key={j} style={{ borderTop: `1px solid ${T.rule}` }}>
+                                <td style={{ ...cell, color: pe.pitchType ? T.ink : T.inkPlaceholder }}>
+                                  {pe.pitchType || '—'}
+                                  {pe.veloEstimate != null ? <span style={{ color: T.inkMuted }}>{`  ${pe.veloEstimate}`}</span> : null}
+                                </td>
+                                <td style={{ ...cell, color: T.inkSecondary }}>
+                                  {PITCH_RESULT_LABEL[pe.pitch] || pe.pitch}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -7084,9 +7346,13 @@ function LoopholeMatrixTagger() {
                     {roster.map((r, idx) => {
                       const st = statusFor(r.num);
                       return (
-                        <div key={idx} style={{
+                        <div key={idx}
+                          onClick={() => { if (r.num) { setLineupPanelOpen(false); setPlayerCard({ side: team, num: r.num, role: 'hitter' }); } }}
+                          style={{
                           display: 'flex', alignItems: 'center', gap: '10px',
                           padding: '7px 4px',
+                          minHeight: '44px',
+                          cursor: r.num ? 'pointer' : 'default',
                           borderBottom: idx < roster.length - 1 ? `1px solid ${T.rule}` : 'none',
                           background: st ? T.rule : 'transparent',
                         }}>
