@@ -4083,7 +4083,8 @@ function LoopholeMatrixTagger({ onSignOut }) {
   const [lastVelo, setLastVelo] = useState({ home: null, away: null });
   const [setupForm, setSetupForm] = useState({
     sport: '',
-    format: '',
+    format: 'Wildcard', // pre-game popup is authoritative; this is only a seed
+    taggingSide: '',    // which bench is the scorer's own
     homeTeam: '',
     awayTeam: '',
     ageDivision: '',
@@ -4121,6 +4122,9 @@ function LoopholeMatrixTagger({ onSignOut }) {
   const EXPANDED_CELL_KEY = 'loophole:expanded-cell';
   const PITCHER_CHANGES_KEY = 'loophole:pitcher-changes';
   const ROSTERS_KEY = 'loophole:rosters';
+  // Rosters filed by team name, so the same team reloads next game instead of the
+  // home/away slot being reused by whoever happens to occupy it.
+  const SAVED_ROSTERS_KEY = 'loophole:saved-rosters';
   const PITCHER_ROSTERS_KEY = 'loophole:pitcher-rosters';
   const PITCH_DETAIL_KEY = 'loophole:pitch-detail';
   const CELL_BASELINES_KEY = 'loophole:cell-baselines';
@@ -4324,6 +4328,26 @@ function LoopholeMatrixTagger({ onSignOut }) {
       storage.set(ROSTERS_KEY, JSON.stringify(rosters));
     }
   }, [rosters, isLoaded]);
+
+  // Keep the by-team-name library in step with the live rosters, so the next game
+  // against the same opponent starts with the lineup already entered.
+  useEffect(() => {
+    if (!isLoaded || !gameMeta) return;
+    try {
+      const lib = JSON.parse(storage.get(SAVED_ROSTERS_KEY) || '{}');
+      let touched = false;
+      for (const side of ['home', 'away']) {
+        const name = (side === 'home' ? gameMeta.homeTeam : gameMeta.awayTeam || '').trim();
+        if (!name) continue;
+        const batting = rosters[side] || [];
+        const pitchers = pitcherRosters[side] || [];
+        if (!batting.length && !pitchers.length) continue;
+        lib[name] = { batting, pitchers, savedAt: Date.now() };
+        touched = true;
+      }
+      if (touched) storage.set(SAVED_ROSTERS_KEY, JSON.stringify(lib));
+    } catch { /* library is a convenience; never block tagging on it */ }
+  }, [rosters, pitcherRosters, gameMeta, isLoaded]);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -6135,6 +6159,7 @@ function LoopholeMatrixTagger({ onSignOut }) {
       awayTeam: setupForm.awayTeam.trim(),
       ageDivision: setupForm.ageDivision,
       format: setupForm.format,
+      taggingSide: setupForm.taggingSide,
       host: setupForm.host.trim(),
       homeLineupSize: setupForm.homeLineupSize,
       awayLineupSize: setupForm.awayLineupSize,
@@ -6145,6 +6170,26 @@ function LoopholeMatrixTagger({ onSignOut }) {
     });
     setFormatDraft({ format: setupForm.format || 'Wildcard', startCount: '0-0', runLimit: null });
     setFormatStep(1);
+
+    // Reload either team's roster if we have seen that name before. Only fills a
+    // side that is currently empty, so anything typed during setup wins.
+    try {
+      const lib = JSON.parse(storage.get(SAVED_ROSTERS_KEY) || '{}');
+      const pick = (side) => {
+        const name = (side === 'home' ? setupForm.homeTeam : setupForm.awayTeam).trim();
+        return name && lib[name] ? lib[name] : null;
+      };
+      ['home', 'away'].forEach(side => {
+        const saved = pick(side);
+        if (!saved) return;
+        if (!(rosters[side] || []).length && saved.batting?.length) {
+          setRosters(prev => ({ ...prev, [side]: saved.batting }));
+        }
+        if (!(pitcherRosters[side] || []).length && saved.pitchers?.length) {
+          setPitcherRosters(prev => ({ ...prev, [side]: saved.pitchers }));
+        }
+      });
+    } catch { /* no library yet */ }
     // v1.5 — Auto-land in the starting cell. Saves the scorer one tap; the matrix
     // peek is still available via "Return to Matrix" from the cell view.
     //   Wildcard format → 'loaded', 0 outs (the format's whole point — bases always loaded)
@@ -6170,7 +6215,7 @@ function LoopholeMatrixTagger({ onSignOut }) {
 
   const isSetupValid =
     setupForm.sport &&
-    setupForm.format &&
+    setupForm.taggingSide &&
     setupForm.homeTeam.trim() &&
     setupForm.awayTeam.trim() &&
     setupForm.ageDivision &&
@@ -6588,17 +6633,21 @@ function LoopholeMatrixTagger({ onSignOut }) {
             </div>
 
             <div style={{ marginBottom: '16px' }}>
-              <label style={labelStyle}>Format</label>
+              <label style={labelStyle}>Your team</label>
               <div style={{ display: 'flex', gap: '6px' }}>
-                {formats.map(fmt => (
+                {[['away', 'Away'], ['home', 'Home']].map(([val, label]) => (
                   <button
-                    key={fmt}
-                    onClick={() => setSetupForm({ ...setupForm, format: fmt })}
-                    style={segmentStyle(setupForm.format === fmt)}
+                    key={val}
+                    onClick={() => setSetupForm({ ...setupForm, taggingSide: val })}
+                    style={segmentStyle(setupForm.taggingSide === val)}
                   >
-                    {fmt}
+                    {label}
                   </button>
                 ))}
+              </div>
+              <div style={{ fontSize: '11px', color: T.inkMuted, marginTop: '6px' }}>
+                Which bench is yours. You get the full dugout on that side and the
+                opposing lineup only on the other. Format is asked once the game starts.
               </div>
             </div>
 
@@ -7417,6 +7466,9 @@ function LoopholeMatrixTagger({ onSignOut }) {
           return null;
         };
         if (!lineupPanelOpen) return null;
+        // Full control of your own bench; the opposing bench is reference only.
+        const ownSide = gameMeta?.taggingSide || null;
+        const canEdit = !ownSide || team === ownSide;
         return (
           <div
             onClick={() => setLineupPanelOpen(false)}
@@ -7474,18 +7526,26 @@ function LoopholeMatrixTagger({ onSignOut }) {
                       color: team === 'home' ? T.paperRaised : T.inkSecondary,
                     }}
                   >{(gameMeta.homeTeam || 'Home')}</button>
-                  <button
-                    onClick={() => setRosterEditor({ team })}
-                    style={{
-                      padding: '7px 12px', fontSize: '11px', fontWeight: 400, borderRadius: '5px', cursor: 'pointer', fontFamily: 'inherit',
-                      border: `1px solid ${T.rule}`, background: 'transparent', color: T.ink,
-                    }}
-                  >Edit</button>
+                  {canEdit ? (
+                    <button
+                      onClick={() => setRosterEditor({ team })}
+                      style={{
+                        padding: '7px 12px', fontSize: '11px', fontWeight: 400, borderRadius: '5px', cursor: 'pointer', fontFamily: 'inherit',
+                        border: `1px solid ${T.rule}`, background: 'transparent', color: T.ink,
+                      }}
+                    >Edit</button>
+                  ) : (
+                    <span style={{ padding: '7px 12px', fontSize: '11px', color: T.inkPlaceholder, whiteSpace: 'nowrap' }}>
+                      Opponent
+                    </span>
+                  )}
                 </div>
 
                 {roster.length === 0 ? (
                   <div style={{ fontSize: '12px', color: T.inkFaint, fontStyle: 'italic', padding: '6px 0' }}>
-                    No lineup for {teamName} yet — tap Edit to add numbers and names.
+                    {canEdit
+                      ? `No lineup for ${teamName} yet — tap Edit to add numbers and names.`
+                      : `No lineup for ${teamName} yet.`}
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column' }}>
