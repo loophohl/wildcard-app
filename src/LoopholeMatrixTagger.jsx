@@ -4011,7 +4011,7 @@ const ExpandedCellView = ({
 };
 
 
-function LoopholeMatrixTagger() {
+function LoopholeMatrixTagger({ onSignOut }) {
   // Events: every tap is { stateKey, outs, timestamp }
   const [events, setEvents] = useState([]);
   const [lastTap, setLastTap] = useState(null);
@@ -4065,6 +4065,7 @@ function LoopholeMatrixTagger() {
   const [rosterEditor, setRosterEditor] = useState(null); // { team } | null
   const [lineupPanelOpen, setLineupPanelOpen] = useState(false);
   const [playerCard, setPlayerCard] = useState(null); // { side, num, role } | null
+  const [signOutArmed, setSignOutArmed] = useState(false);
   // Pre-game format popup. null once dismissed; 1 = format, 2 = Wildcard options.
   const [formatStep, setFormatStep] = useState(null);
   const [formatDraft, setFormatDraft] = useState({ format: 'Wildcard', startCount: '0-0', runLimit: null });
@@ -6782,6 +6783,20 @@ function LoopholeMatrixTagger() {
           {storageMode === 'local-storage' && 'Saved'}
           {storageMode === 'memory-only' && 'Not saving'}
           {storageMode === 'checking' && '···'}
+          {onSignOut && (
+            // Two taps, matching End game. Signing out clears the cached session,
+            // and at a field with no signal that is unrecoverable until there is
+            // reception again — too costly for a single stray tap mid-inning.
+            <button
+              onClick={() => { if (signOutArmed) { onSignOut(); } else { setSignOutArmed(true); setTimeout(() => setSignOutArmed(false), 4000); } }}
+              style={{
+                marginLeft: '10px', background: signOutArmed ? T.ink : 'transparent',
+                border: 'none', padding: '4px 6px', fontFamily: 'inherit', fontSize: '11px',
+                color: signOutArmed ? T.paper : T.inkMuted, cursor: 'pointer',
+                textDecoration: signOutArmed ? 'none' : 'underline',
+              }}
+            >{signOutArmed ? 'Tap to confirm' : 'Sign out'}</button>
+          )}
         </span>
       </div>
 
@@ -8051,6 +8066,12 @@ function WildCardLauncher() {
     }
   }, []);
 
+  const handleSignOut = async () => {
+    try { await supabase?.auth.signOut(); } catch { /* offline: clear locally anyway */ }
+    setSession(null);
+    setOpened(false);
+  };
+
   if (!splashDone || session === undefined) {
     return <WildCardSplash onDone={() => setSplashDone(true)} />;
   }
@@ -8063,7 +8084,7 @@ function WildCardLauncher() {
   }
 
   if (opened) {
-    return <LoopholeMatrixTagger />;
+    return <LoopholeMatrixTagger onSignOut={authConfigured ? handleSignOut : undefined} />;
   }
 
   return (
