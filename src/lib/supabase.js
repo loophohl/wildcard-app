@@ -19,7 +19,10 @@ export const supabase = isConfigured
       auth: {
         persistSession: true,      // survives app launches; no re-login between innings
         autoRefreshToken: true,
-        detectSessionInUrl: false, // no OAuth redirect flow in this pass
+        // Email confirmation is on, so the link Supabase mails back lands here with
+        // tokens in the URL fragment. This has to be true or that redirect is
+        // ignored and the confirmed user still sees the sign-in screen.
+        detectSessionInUrl: true,
         storageKey: 'loophohl.auth',
       },
     })

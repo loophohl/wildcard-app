@@ -7886,7 +7886,7 @@ function WildCardLogin({ onSignedIn }) {
       const { data, error } = await supabase.auth[fn]({ email: email.trim(), password });
       if (error) { setMsg(error.message); return; }
       if (data?.session) onSignedIn(data.session);
-      else setMsg('Account created. Sign in to continue.');
+      else setMsg('Account created. Check your email for the confirmation link, then sign in.');
     } catch {
       setMsg('Could not reach the server. Check your connection.');
     } finally {
